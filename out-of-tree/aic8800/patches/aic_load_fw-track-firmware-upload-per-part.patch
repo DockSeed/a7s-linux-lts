@@ -87,7 +87,7 @@ the old one-bit flag with a name. Cold boot -> array empty ->
 aicwf_fw_part_loaded() false -> site 1 cannot fire, site 2 cannot fire (8d80 is
 not a post-download id) -> download -> mark. Re-enumeration as 8d81 -> the path
 is found -> true -> site 1 fires. That is bit-for-bit the old state machine.
-The only divergence is between two different paths, which is the broken case.
+The only divergence is between two different paths: the two-part case above.
 
 The table is a fixed four slots rather than a list because this driver serves
 one soldered part plus at most a stray dongle. A full table answers "already

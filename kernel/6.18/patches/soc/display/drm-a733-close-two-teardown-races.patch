@@ -284,8 +284,8 @@ answers.
 
 Fix 2: the A523/T527 series carries a patch of its own titled "channel quiesce
 before stopping" -- which this driver's DE_QUIESCE_FRAMES comment already cites
-as the precedent. Neither that series nor the vendor applies the same care to the
-failure path; this patch adds it, as one label.
+as the precedent. Neither that series nor the vendor driver covers the failure
+path; this patch adds it, as one label.
 
 Verified
 ========

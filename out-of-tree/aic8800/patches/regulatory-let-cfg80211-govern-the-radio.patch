@@ -1,5 +1,5 @@
 From: DockSeed <dockseed@proton.me>
-Subject: [PATCH] aic8800: let cfg80211 govern this radio, instead of claiming self-management with no domain
+Subject: [PATCH] aic8800: let cfg80211 govern this radio instead of self-management with no domain
 
 Known issue: `phy0` is `REGULATORY_WIPHY_SELF_MANAGED`, so the regulatory
 database this image now loads correctly (`CONFIG_CRYPTO_SHA256=y`
