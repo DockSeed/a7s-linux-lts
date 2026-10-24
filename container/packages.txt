@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# Debian packages the kernel build needs in the builder (cross build for arm64).
+# One per line; '#' starts a comment.
+git
+curl
+ca-certificates
+make
+build-essential
+gcc-aarch64-linux-gnu
+# the arm64 libc headers: with them the kernel sets CONFIG_CC_CAN_LINK
+libc6-dev-arm64-cross
+binutils-aarch64-linux-gnu
+bc
+bison
+flex
+libssl-dev
+libelf-dev
+libncurses-dev
+kmod
+cpio
+xz-utils
+rsync
+patch
+python3
+device-tree-compiler

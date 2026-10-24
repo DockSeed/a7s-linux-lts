@@ -1,0 +1,22 @@
+# Build directories (scripts/build.sh defaults; WORK_DIR, OUT_DIR, CACHE_DIR move them).
+/work/
+/out/
+/cache/
+
+# No build products or vendor binaries in the tree.
+*.tar
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+*.tar.zst
+*.tgz
+*.zst
+*.ko
+*.o
+*.part
+Image
+
+# Editor and tool leftovers
+*~
+*.swp
+__pycache__/
