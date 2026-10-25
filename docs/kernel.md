@@ -1,10 +1,10 @@
-# Kernel: Linux 6.18.57
+# Kernel: Linux 6.18.58
 
 `kernel/6.18/` is the kernel input of this recipe (the AIC8800 driver is in
 `out-of-tree/aic8800/`):
 
 - `series`: 256 patch paths, applied in this order to the pristine
-  `linux-6.18.57.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
+  `linux-6.18.58.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
 - `patches/`: `backport/` (other people's patches, to drop once 6.18.y has
   them), `soc/<subsystem>/` (A733 support, any A733 board) and `board/dts/`
   (Cubie A7S wiring). File names carry no numbers; the order lives in `series`.

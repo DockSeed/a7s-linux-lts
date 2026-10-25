@@ -11,17 +11,17 @@
 # Output: OUT_DIR/{Image,<dtb>,config,System.map,modules/,KERNEL-ID}.
 
 # --- pins -----------------------------------------------------------------------
-# Linux stable v6.18.57 (longterm). The sha256 is the one cdn.kernel.org lists
+# Linux stable v6.18.58 (longterm). The sha256 is the one cdn.kernel.org lists
 # in its signed sha256sums.asc (checked with the kernel.org autosigner key
 # B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1; the tarball's own signature
-# linux-6.18.57.tar.sign by Greg Kroah-Hartman, 647F28654894E3BD457199BE38DBBDC86092693E,
+# linux-6.18.58.tar.sign by Greg Kroah-Hartman, 647F28654894E3BD457199BE38DBBDC86092693E,
 # is good over the uncompressed tar). fetch refuses any other bytes.
 # A version bump is: the version and sha256 here, and every patch that no
 # longer applies at fuzz 0.
-KERNEL_VERSION="6.18.57"
+KERNEL_VERSION="6.18.58"
 KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
 KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/${KERNEL_TARBALL}"
-KERNEL_SHA256="5bd9acdc82ec5efc3790ae840e5aaa40dfde7efff261cf6dde902dc570acf98c"
+KERNEL_SHA256="069b19f9032c4dac8149ae4b6520c35debca0f42a9f6d52ee55ba6ca9b818013"
 KERNEL_ARCH="arm64"
 # The boot dtb built and shipped (relative to arch/arm64/boot/dts/).
 KERNEL_DTB="${A7S_KERNEL_DTB:-allwinner/sun60i-a733-cubie-a7s.dtb}"
