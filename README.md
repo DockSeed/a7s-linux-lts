@@ -71,6 +71,22 @@ come from, how to change the series and what is not carried.
 [out-of-tree/aic8800/README.md](out-of-tree/aic8800/README.md) describes the
 driver and its patches. The driver's firmware is not part of this recipe.
 
+## Who wrote this
+
+One human and AI coding agents (Claude). The code was written by the agents:
+the patches, the build scripts and the documentation. Every patch of our own
+carries `Assisted-by: Claude`. The decisions were the human's:
+
+- to follow the 6.18 LTS line and take stable releases as separate commits,
+  rather than move to a newer kernel;
+- to keep this recipe separate from the boot chain and the image recipe, with
+  no copies between them;
+- to keep vendor firmware out of the recipe: the WLAN firmware is not part of
+  it, and nothing that may not be redistributed is committed here;
+- what counts as proven: a statement about the hardware is made only after it
+  was measured on a board, and a stable release is taken over only after a
+  board has booted it.
+
 ## Licence
 
 Our own files are `GPL-2.0-only OR MIT`. The patches and the config are
