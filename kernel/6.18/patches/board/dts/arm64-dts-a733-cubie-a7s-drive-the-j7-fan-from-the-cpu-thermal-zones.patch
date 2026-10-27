@@ -1,0 +1,147 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: DockSeed <dockseed@proton.me>
+Date: Tue, 27 Oct 2026 17:00:00 +0100
+Subject: [PATCH] arm64: dts: a733: cubie-a7s: drive the J7 fan from the CPU
+ thermal zones
+
+The Cubie A7S has a fan header, J7, whose PWM line nothing drives yet.
+Hang a pwm-fan on it and make it a cooling device of both CPU zones, so a
+fan plugged into J7 runs by temperature instead of at whatever level its
+own input floats to.
+
+Where each value comes from
+
+  * The header: schematic v1.10, page 16 ("KEY_LED_FAN"). J7 carries GND
+    on pin 1, PJ27_PWM1-9 through R81 (1 kOhm series) on pin 2 and
+    VCC5V0_SYS on pin 3; pads 4 and 5 are GND. No tachometer pin, so the
+    node has no interrupts, and no switch in the 5 V supply, so there is
+    no regulator to name as fan-supply.
+  * The pin: PJ27 function 3 is PWM1-9 (A733 user manual V1.00, Table
+    18-36, and PJ_CFG3 bits 15:12, 0011 = PWM1-9). PWM1 is the controller
+    at 0x02528000 described by `arm64-dts-a733-add-the-two-pwm-controllers`;
+    this patch adds its pin state and enables it. PJ26 shares the PCCR89
+    clock pair with channel 9 and is the status LED as a plain GPIO, so no
+    other PWM user can contend for the pair's divider.
+  * The period: 40000 ns, 25 kHz, the frequency 4-wire PWM fans are built
+    for. Normal polarity: there is no transistor between pin and header,
+    so a high pin is a high fan input.
+  * cooling-levels: off and four equal steps of 25 %.
+  * The trip: one active trip per CPU zone at 60 C with 10 C hysteresis,
+    in the trip-2/map1 slot that `arm64-dts-a733-idle-injection-cooling`
+    left free for this patch. 60 C is above the 31-45 C idle measured on a
+    board with heatsink and fan and 30 C below the 90 C passive trip, so
+    the fan steps through its levels before cpufreq throttles. 10 C is
+    wider than the sensor noise described in
+    `thermal-sun8i-a733-filter-the-trend-fed-to-step-wise`, so noise alone
+    does not switch the fan on and off. Both zones map the same fan; the
+    thermal core sets it to the higher of the two requested states.
+
+What a board without a fan sees: the channel drives a 1 kOhm resistor
+into an open header and nothing else changes. pwm-fan probes without a
+tachometer, as the binding allows.
+
+Between probe and the first zone evaluation pwm-fan holds the fan at its
+highest level; the first evaluation below the trip turns it off.
+
+Checked on a board without a fan on J7: pwm-fan probes as a hwmon
+device and a cooling device bound to the active trip of both CPU zones;
+under load across the trip the state rose and PWM1 channel 9 drove a
+40000 ns period at the duty of that level with normal polarity, and back
+below the trip the state returned to 0 and the channel was disabled. A
+fan on J7 itself has not been run.
+
+Assisted-by: Claude
+---
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
+@@ -4692,3 +4692,90 @@
+ 		};
+ 	};
+ };
++
++/*
++ * Fan header J7 (schematic v1.10, page 16 "KEY_LED_FAN"). Three pins:
++ * 1 GND, 2 PJ27_PWM1-9 through R81 (1 kOhm series), 3 VCC5V0_SYS; pads 4
++ * and 5 are GND. There is no tachometer pin and no switch in the supply,
++ * so the PWM line is the only control: the fan's own PWM input decides
++ * the speed, and VCC5V0_SYS has no regulator node to name as fan-supply.
++ *
++ * PJ27 function 3 is PWM1-9 (A733 user manual V1.00, Table 18-36 and
++ * PJ_CFG3 bits 15:12 = 0011). Its reset value 1111 is IO disable, so
++ * until the PWM controller probes the pin floats and the fan's input sits
++ * at whatever level the fan itself pulls it to. PJ26, the other half of
++ * the PCCR89 pair, is the status LED as a plain GPIO, so no PWM shares
++ * this channel's clock divider.
++ *
++ * pwms: channel 9, 40000 ns (25 kHz, the 4-wire PWM fan convention),
++ * normal polarity: no transistor sits between pin and header, so a high
++ * pin is a high fan input. cooling-levels: off and four equal steps of
++ * 25 %.
++ *
++ * The fan hangs off both CPU zones at trip-2/map1, the slot the thermal
++ * zones leave free for it. The cooling device takes the higher of the two
++ * requested states. 60 C sits above the 31-45 C idle of a board with
++ * heatsink and fan and 30 C below the 90 C passive trip, so the fan has
++ * that band to step through its levels before cpufreq throttles. The
++ * 10 C hysteresis is wider than the sensor noise (up to 6.3 K
++ * peak-to-peak, see thermal-sun8i-a733-filter-the-trend-fed-to-step-wise),
++ * so noise alone cannot switch the fan on and off. With nothing plugged
++ * into J7 the channel drives a 1 kOhm resistor into an open pin and
++ * nothing else changes.
++ */
++&pio {
++	pwm1_pj27_pin: pwm1-pj27-pin {
++		pins = "PJ27";
++		allwinner,pinmux = <3>;
++		function = "pwm1";
++	};
++};
++
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm1_pj27_pin>;
++	status = "okay";
++};
++
++/ {
++	fan: pwm-fan {
++		compatible = "pwm-fan";
++		pwms = <&pwm1 9 40000 0>;
++		cooling-levels = <0 64 128 192 255>;
++		#cooling-cells = <2>;
++	};
++};
++
++&cpul_thermal {
++	trips {
++		cpul_fan: cpul-trip-2 {
++			temperature = <60000>;
++			type = "active";
++			hysteresis = <10000>;
++		};
++	};
++
++	cooling-maps {
++		map1 {
++			trip = <&cpul_fan>;
++			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++		};
++	};
++};
++
++&cpub_thermal {
++	trips {
++		cpub_fan: cpub-trip-2 {
++			temperature = <60000>;
++			type = "active";
++			hysteresis = <10000>;
++		};
++	};
++
++	cooling-maps {
++		map1 {
++			trip = <&cpub_fan>;
++			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++		};
++	};
++};

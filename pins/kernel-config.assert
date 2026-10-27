@@ -27,7 +27,7 @@ line CONFIG_CMA_SIZE_MBYTES=256
 y SECURITY_DMESG_RESTRICT
 y DYNAMIC_DEBUG
 y FTRACE
-y ENABLE_DEFAULT_TRACERS
+y FUNCTION_TRACER
 y DEBUG_FS
 y KPROBES
 y KPROBE_EVENTS
@@ -295,3 +295,26 @@ file nfs.ko
 file nfsv3.ko
 file nfsv4.ko
 file cifs.ko
+# Security modules as in Debian: AppArmor is the default LSM, with Yama,
+# Landlock and the BPF LSM. EXPORT_BINARY would select ZSTD_COMPRESS built in.
+y SECURITY_APPARMOR
+y SECURITY_YAMA
+y SECURITY_LANDLOCK
+y BPF_LSM
+y AUDIT
+line CONFIG_LSM="landlock,lockdown,yama,integrity,apparmor,bpf"
+line # CONFIG_SECURITY_APPARMOR_EXPORT_BINARY is not set
+y SYN_COOKIES
+# a7s-boot-good.service clears the boot counter in RTC GP_DATA_REG7 through
+# /dev/mem while the RTC driver holds that range; IO_STRICT_DEVMEM would refuse it.
+line # CONFIG_IO_STRICT_DEVMEM is not set
+# BTF needs pahole in the builder; without it olddefconfig drops BTF silently.
+y DEBUG_INFO_BTF
+y FTRACE_SYSCALLS
+# Snaps are xz squashfs images; NFLOG and numgen for Kubernetes network policy
+# and kube-proxy's nftables mode.
+m SQUASHFS
+y SQUASHFS_XZ
+y SQUASHFS_ZSTD
+m NETFILTER_XT_TARGET_NFLOG
+m NFT_NUMGEN

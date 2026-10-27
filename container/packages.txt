@@ -23,3 +23,5 @@ rsync
 patch
 python3
 device-tree-compiler
+# BTF for CONFIG_DEBUG_INFO_BTF (bpftool, bpftrace, BPF LSM)
+pahole

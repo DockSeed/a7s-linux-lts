@@ -253,4 +253,5 @@ soc/dts/arm64-dts-a733-dp-audio-card-disabled.patch
 soc/sound/asoc-sun4i-i2s-keep-the-fifo-across-a-pause.patch
 soc/dts/arm64-dts-a733-use-the-mainline-name-for-the-cubie-a7s.patch
 soc/dts/arm64-dts-a733-add-the-cubie-a7s-leds.patch
+board/dts/arm64-dts-a733-cubie-a7s-drive-the-j7-fan-from-the-cpu-thermal-zones.patch
 soc/mmc/mmc-sunxi-a733-no-emmc-ddr52-on-the-sd-slot-by-default.patch
