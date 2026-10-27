@@ -56,6 +56,14 @@ Allwinner's BSP says so in its header.
   policy is shipped), `MEMCG_SWAP` (no such option in 6.18) and the ZFS
   tools. A new option of this kind goes in as a module, measured with the
   service that needs it, not by copying a distribution config.
+- **Home server.** Also modules: the NFS server (`NFSD`, v3 always,
+  `NFSD_V4`), software RAID for `mdadm` (`DM_RAID` pulls in `BLK_DEV_MD` and
+  the RAID personalities, so they do not show in `config`), device mapper for
+  LUKS and LVM with thin pools and snapshots, NBD, the common USB network
+  adapters (`r8152`, `ax88179_178a`, CDC Ethernet/NCM, RNDIS), USB video and
+  audio class, USB printers, the CH341 and PL2303 serial adapters next to
+  CP210x and FTDI, kTLS, BBR and CAKE. `HIDRAW`, `USB_HIDDEV` (UPS monitoring
+  over USB) and `PSI` are built in. zswap stays out: swap is zram.
 
 ## Not carried
 
