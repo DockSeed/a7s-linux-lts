@@ -44,6 +44,18 @@ Allwinner's BSP says so in its header.
   so are Btrfs, XFS, F2FS and the NFS and SMB clients, for disks and network
   shares (the tools come from Debian: `btrfs-progs`, `xfsprogs`, `f2fs-tools`,
   `nfs-common`, `cifs-utils`).
+- **Container and VM host.** The config is minimal, but a server's standard
+  equipment is in, as modules where Kconfig allows it: what Docker, containerd
+  and Podman need (`VETH`, `BRIDGE`, `BRIDGE_NETFILTER`, `OVERLAY_FS`, the
+  iptables/nftables NAT targets, `NF_CT_NETLINK`, IPVS, VXLAN, MACVLAN, IPVLAN,
+  `CFS_BANDWIDTH`, `BLK_DEV_THROTTLING`, `CHECKPOINT_RESTORE`), what a KVM host
+  needs beyond `KVM=y` (`VHOST_NET`, `VHOST_VSOCK`, `MACVTAP`), and the usual
+  firewall and traffic-control pieces (ipset, the common xt matches, tc
+  ingress/flower/htb/fq_codel) plus WireGuard. Checked with moby's
+  `contrib/check-config.sh`; it still lists AppArmor and SELinux (no LSM
+  policy is shipped), `MEMCG_SWAP` (no such option in 6.18) and the ZFS
+  tools. A new option of this kind goes in as a module, measured with the
+  service that needs it, not by copying a distribution config.
 
 ## Not carried
 
