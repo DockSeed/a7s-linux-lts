@@ -66,7 +66,7 @@ Assisted-by: Claude
 ---
 --- a/drivers/pinctrl/sunxi/pinctrl-sunxi-dt.c
 +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi-dt.c
-@@ -143,7 +143,8 @@
+@@ -144,7 +144,8 @@
   */
  static int prepare_function_table(struct device *dev, struct device_node *pnode,
  				  struct sunxi_desc_pin *pins, int npins,
@@ -76,7 +76,7 @@ Assisted-by: Claude
  {
  	struct device_node *node;
  	struct property *prop;
-@@ -206,9 +207,18 @@
+@@ -207,9 +208,18 @@
  	/*
  	 * Assign the function's memory and fill in GPIOs, IRQ and a sentinel.
  	 * The extra functions will be filled in later.
@@ -97,7 +97,7 @@ Assisted-by: Claude
  	for (i = 0; i < npins; i++) {
  		struct sunxi_desc_pin *pin = &pins[i];
  		int bank = (pin->pin.number - pin_base) / PINS_PER_BANK;
-@@ -352,7 +362,7 @@
+@@ -353,7 +363,7 @@
  		return PTR_ERR(pins);
  
  	ret = prepare_function_table(&pdev->dev, pnode, pins, desc->npins,

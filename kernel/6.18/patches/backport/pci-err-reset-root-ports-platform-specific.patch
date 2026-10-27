@@ -50,7 +50,7 @@ diff --git a/include/linux/pci.h b/include/linux/pci.h
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -4805,6 +4805,19 @@
+@@ -4812,6 +4812,19 @@
  
  void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
  {
