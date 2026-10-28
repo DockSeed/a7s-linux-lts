@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# A pull request must still apply and compile: the pinned kernel tarball, the
+# whole patch series at fuzz 0, and the A733 driver directories (compile-check
+# of ./build.sh). The full kernel is built only for a release (release.yml).
+name: compile-check
+
+on:
+  pull_request:
+    paths:
+      - 'kernel/**'
+      - 'out-of-tree/**'
+      - 'scripts/**'
+      - 'pins/**'
+      - 'container/**'
+      - 'build.sh'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: compile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      KERNEL_ENGINE: docker
+    steps:
+      - name: Check out the recipe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Restore the download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: cache
+          key: downloads-${{ hashFiles('scripts/lib/kernel.sh', 'scripts/lib/aic8800.sh') }}
+
+      - name: Fetch
+        run: ./build.sh fetch
+
+      - name: Apply the series
+        run: ./build.sh apply-patches
+
+      - name: Compile the A733 directories
+        run: ./build.sh compile-check

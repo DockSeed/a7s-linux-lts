@@ -1,0 +1,181 @@
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# Build the kernel with ./build.sh and attach the result to a release.
+#
+#   git tag v6.18.59-R1 && git push origin v6.18.59-R1
+#
+# builds the tagged commit (kernel release 6.18.59-r1 for -R1, 6.18.59-t1 for
+# -T1) and creates a DRAFT release named after the tag, with
+# the CHANGELOG.md section of that version as its text. A person reads the draft
+# and publishes it. A -T<n> tag is a test build: its draft is marked as a
+# pre-release; a -R<n> tag is a release. A manual run (workflow_dispatch) builds the same files and
+# keeps them as a workflow artifact for 14 days; it creates no release.
+#
+# The tag must be v<kernel version>-T<n> or -R<n> and name the kernel version of
+# scripts/lib/kernel.sh; CHANGELOG.md must have a section for it. Both are
+# checked before the build starts. What is attached and what is not: README.md,
+# "Releases".
+name: release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+-[TR][0-9]+']
+  workflow_dispatch:
+
+# Nothing by default; each job asks for what it needs.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # x86_64 with Docker on the runner; the build itself runs in the pinned
+    # builder container of ./build.sh and cross compiles for arm64. 4 vCPUs.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    env:
+      KERNEL_ENGINE: docker
+    steps:
+      - name: Check out the recipe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the tag and the changelog
+        if: github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^KERNEL_VERSION="\(.*\)"$/\1/p' scripts/lib/kernel.sh)"
+          [ -n "${version}" ] || { echo "::error::no KERNEL_VERSION in scripts/lib/kernel.sh"; exit 1; }
+          case "${TAG}" in
+            "v${version}-"[TR][0-9]*) ;;
+            *) echo "::error::tag ${TAG} does not name the kernel version of this commit (${version}); expected v${version}-T<n> or v${version}-R<n>"; exit 1 ;;
+          esac
+          scripts/release-notes.sh "${TAG}" > /dev/null
+
+      - name: Name the revision
+        # v6.18.59-R1 builds the kernel 6.18.59-r1, v6.18.59-T1 builds 6.18.59-t1;
+        # a manual run on a branch is t0.
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          rev="t0"
+          [ -z "${TAG}" ] || rev="$(printf '%s' "${TAG##*-}" | tr 'TR' 'tr')"
+          echo "A7S_KERNEL_REVISION=${rev}" >> "${GITHUB_ENV}"
+
+      - name: Restore the download cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: cache
+          # Everything in it is checked against a pinned sha256 or commit id
+          # before use, so a stale or damaged entry is dropped, not trusted.
+          key: downloads-${{ hashFiles('scripts/lib/kernel.sh', 'scripts/lib/aic8800.sh') }}
+
+      - name: Disk and CPU
+        run: |
+          nproc
+          df -h .
+          ${KERNEL_ENGINE} --version
+
+      - name: Build
+        run: ./build.sh all
+
+      - name: Make the Debian packages
+        run: ./build.sh deb
+
+      - name: Make the release files
+        run: ./build.sh package
+
+      - name: Check the release files
+        working-directory: out/release
+        run: |
+          set -euo pipefail
+          sha256sum -c SHA256SUMS
+          ls -l
+
+      - name: Keep the release files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-files
+          path: out/release/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out the recipe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fetch the release files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-files
+          path: dist
+
+      - name: Check them again
+        working-directory: dist
+        run: sha256sum -c SHA256SUMS
+
+      - name: Write the release text
+        run: |
+          set -euo pipefail
+          tarball_sha="$(sed -n 's/^tarball_sha256=//p' dist/KERNEL-ID)"
+          version="$(sed -n 's/^version=//p' dist/KERNEL-ID)"
+          {
+            scripts/release-notes.sh "${TAG}"
+            sed -e "s/@VERSION@/${version}/g" -e "s/@TARBALL_SHA256@/${tarball_sha}/g" -e "s/@COMMIT@/${GITHUB_SHA}/g" <<'TEXT'
+
+          ## Files
+
+          Built by GitHub Actions from commit `@COMMIT@` with `./build.sh`. `KERNEL-ID` has the build identity, `SHA256SUMS` the checksums of every file.
+
+          - `linux-image-*.deb` and `linux-headers-*.deb`: the kernel with its modules and device trees, and the build environment for modules (DKMS). They are named for the release, so they install beside an older kernel.
+          - `Image`, the device tree blob, `config` and `System.map`: as `./build.sh` leaves them in `out/`.
+          - `a7s-linux-lts-*-modules.tar.xz`: the kernel modules (`lib/modules/<release>/`), `depmod` run over the set.
+
+          ## Corresponding source
+
+          - The recipe (patches, config, build scripts) is the source archive of this tag that GitHub attaches to the release, commit `@COMMIT@`.
+          - `linux-@VERSION@.tar.xz`: the unchanged kernel tarball from cdn.kernel.org, sha256 `@TARBALL_SHA256@`.
+
+          The same build from the source, `./build.sh` in the tagged checkout, gives the same `Image`, device tree blob, `config` and `System.map`; their checksums are in `KERNEL-ID`.
+
+          ## Not included
+
+          The AIC8800 WLAN/BT driver and its firmware: the image recipe builds the driver from its pinned source.
+          TEXT
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create the draft release
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version=//p' dist/KERNEL-ID)"
+          extra=()
+          case "${TAG}" in *-T[0-9]*) extra+=(--prerelease) ;; esac
+          gh release create "${TAG}" dist/* \
+            --verify-tag \
+            --draft \
+            "${extra[@]}" \
+            --title "Linux ${version} for the Radxa Cubie A7S (${TAG})" \
+            --notes-file release-notes.md
