@@ -18,3 +18,4 @@ aic_load_fw-return-an-errno-from-a-failed-configuration-or-upload.patch
 aic_load_fw-a-timed-out-firmware-message-fails-and-is-freed.patch
 aic8800_fdrv-count-received-data-frames-in-the-interface-statistics.patch
 aic_load_fw-keep-the-driver-data-of-the-usb-device-alone.patch
+aic8800_fdrv-keep-the-driver-data-of-the-usb-device-alone.patch

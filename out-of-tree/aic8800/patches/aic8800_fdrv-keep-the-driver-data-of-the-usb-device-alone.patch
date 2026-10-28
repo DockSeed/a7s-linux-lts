@@ -1,0 +1,170 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: keep the driver data of the USB device alone
+
+aicwf_usb_probe() stored the bus structure in the driver data of the USB
+device (usb_dev->dev is &usb->dev, dev_set_drvdata(dev, bus_if)), although
+aic8800_fdrv is a USB interface driver. The driver data of a USB device
+belongs to the driver bound to the device; with a device tree node on the
+hub port of the module that is onboard_usb_dev, which keeps its struct
+onboard_dev there and reads it back in onboard_dev_usbdev_disconnect().
+See aic_load_fw-keep-the-driver-data-of-the-usb-device-alone for the effect:
+after aicwf_usb_disconnect() has freed the bus structure, onboard_usb_dev
+takes it for its struct onboard_dev.
+
+The bus handle is now the struct device of the USB interface, whose driver
+data already is the struct aic_usb_dev (usb_set_intfdata()). The bus
+operations, aicwf_bus_init() and aicwf_bus_deinit() reach the bus structure
+through aicwf_dev_to_bus(), and rwnx_close() takes it from rwnx_hw->usbdev
+instead of reading the driver data of rwnx_hw->dev.
+
+usb_dev->dev stays the USB device, and so does rwnx_hw->dev: they are the
+parent of the wiphy (and so of the netdev), the device of the firmware
+requests for the configuration file, the DMA mapping device and the owner of
+the wakeup sources. They are left as they are: moving them to the interface
+would change the sysfs parent of the network device, which this fix does not
+need. Nothing reads their driver data any more; the SDIO branch of
+rwnx_close() still does, and is not built.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index 9c47e07..ebabd81 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -88,7 +88,7 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
+         AICWFDBG(LOGERROR, "device not found\n");
+         return -1;
+     }
+-    bus_if = dev_get_drvdata(dev);
++    bus_if = aicwf_dev_to_bus(dev);
+     #if defined CONFIG_USB_SUPPORT && defined CONFIG_USB_NO_TRANS_DMA_MAP
+     #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+     bus_if->cmd_buf = usb_alloc_coherent(bus_if->bus_priv.usb->udev, CMD_BUF_MAX, (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL), &bus_if->bus_priv.usb->cmd_dma_trans_addr);
+@@ -209,7 +209,7 @@ void aicwf_bus_deinit(struct device *dev)
+     }
+ 	AICWFDBG(LOGINFO, "%s Enter\r\n", __func__);
+ 
+-    bus_if = dev_get_drvdata(dev);
++    bus_if = aicwf_dev_to_bus(dev);
+     aicwf_bus_stop(bus_if);
+ 
+ #ifdef AICWF_USB_SUPPORT
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h
+index 920a53f..caa139e 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h
+@@ -253,6 +253,25 @@ struct aicwf_rx_priv {
+ 
+ };
+ 
++#ifdef AICWF_USB_SUPPORT
++/* The bus handle is the struct device of the USB interface this driver is
++ * bound to. Its driver data is the struct aic_usb_dev, set by
++ * usb_set_intfdata(); the bus is reached through it. The driver data of the
++ * USB device itself belongs to the driver bound to the device.
++ */
++static inline struct aicwf_bus *aicwf_dev_to_bus(struct device *dev)
++{
++    struct aic_usb_dev *usb_dev = dev_get_drvdata(dev);
++
++    return usb_dev ? usb_dev->bus_if : NULL;
++}
++#else
++static inline struct aicwf_bus *aicwf_dev_to_bus(struct device *dev)
++{
++    return dev_get_drvdata(dev);
++}
++#endif
++
+ static inline int aicwf_bus_start(struct aicwf_bus *bus)
+ {
+     return bus->ops->start(bus->dev);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index b368165..301db61 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -1457,7 +1457,7 @@ static void aicwf_usb_send_msg_complete(struct urb *urb)
+ static int aicwf_usb_bus_txmsg(struct device *dev, u8 *buf, u32 len)
+ {
+     int ret = 0;
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+ 
+     if (usb_dev->state != USB_UP_ST)
+@@ -1715,7 +1715,7 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *pkt)
+ {
+     uint prio;
+     int ret = -EBADE;
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usbdev = bus_if->bus_priv.usb;
+ 
+     //printk("%s\n", __func__);
+@@ -1751,7 +1751,7 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+     struct aicwf_usb_buf *usb_buf;
+     int ret = 0;
+     unsigned long flags;
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+     struct rwnx_txhdr *txhdr = (struct rwnx_txhdr *)skb->data;
+     struct rwnx_hw *rwnx_hw = usb_dev->rwnx_hw;
+@@ -1918,7 +1918,7 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+ #endif
+ static int aicwf_usb_bus_start(struct device *dev)
+ {
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+ 
+     if (usb_dev->state == USB_UP_ST)
+@@ -1994,7 +1994,7 @@ void aicwf_usb_cancel_all_urbs(struct aic_usb_dev *usb_dev){
+ 
+ static void aicwf_usb_bus_stop(struct device *dev)
+ {
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+ 
+ 	AICWFDBG(LOGINFO, "%s\r\n", __func__);
+@@ -2515,11 +2515,14 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
+         goto out_free_usb;
+     }
+ 
+-    dev = usb_dev->dev;
++    /* usb_dev->dev stays the USB device: it is the parent of the wiphy and
++     * the device for firmware requests. The bus handle is the interface, see
++     * aicwf_dev_to_bus().
++     */
++    dev = &intf->dev;
+     bus_if->dev = dev;
+     usb_dev->bus_if = bus_if;
+     bus_if->bus_priv.usb = usb_dev;
+-    dev_set_drvdata(dev, bus_if);
+ 
+     bus_if->ops = &aicwf_usb_bus_ops;
+ 
+@@ -2604,7 +2607,7 @@ static void aicwf_usb_disconnect(struct usb_interface *intf)
+ 		rwnx_del_timer(&usb_dev->rwnx_hw->p2p_alive_timer);
+ 	}
+ #endif
+-    aicwf_bus_deinit(usb_dev->dev);
++    aicwf_bus_deinit(&intf->dev);
+     aicwf_usb_deinit(usb_dev);
+ 
+ #ifdef CONFIG_GPIO_WAKEUP
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+index 63ecf38..d886f56 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -1505,7 +1505,8 @@ static int rwnx_close(struct net_device *dev)
+     int test_counter = 0;
+ #if defined(AICWF_USB_SUPPORT)
+     struct aic_usb_dev *usbdev = NULL;
+-    bus_if = dev_get_drvdata(rwnx_hw->dev);
++    if (rwnx_hw->usbdev)
++        bus_if = rwnx_hw->usbdev->bus_if;
+     if (bus_if)
+         usbdev = bus_if->bus_priv.usb;
+ #endif

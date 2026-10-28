@@ -144,6 +144,9 @@ explanation in its header.
     disconnect then took the freed bus structure for its own state. The bus
     handle is now the interface and the bus structure is reached through the
     interface's driver data.
+20. `aic8800_fdrv-keep-the-driver-data-of-the-usb-device-alone` - the same
+    for the WiFi module. The parent of the wiphy, the firmware-request and DMA
+    device and the wakeup sources stay on the USB device.
 
 Several patches add small module parameters or counters under
 `/sys/module/<module>/parameters/` to inject the failure they fix; they are
