@@ -297,12 +297,15 @@ file nfsv4.ko
 file cifs.ko
 # Security modules as in Debian: AppArmor is the default LSM, with Yama,
 # Landlock and the BPF LSM. EXPORT_BINARY would select ZSTD_COMPRESS built in.
+# No Lockdown LSM: it selects MODULE_SIG, and signature checking has no keys here.
+line # CONFIG_SECURITY_LOCKDOWN_LSM is not set
+line # CONFIG_MODULE_SIG is not set
 y SECURITY_APPARMOR
 y SECURITY_YAMA
 y SECURITY_LANDLOCK
 y BPF_LSM
 y AUDIT
-line CONFIG_LSM="landlock,lockdown,yama,integrity,apparmor,bpf"
+line CONFIG_LSM="landlock,yama,integrity,apparmor,bpf"
 line # CONFIG_SECURITY_APPARMOR_EXPORT_BINARY is not set
 y SYN_COOKIES
 # a7s-boot-good.service clears the boot counter in RTC GP_DATA_REG7 through

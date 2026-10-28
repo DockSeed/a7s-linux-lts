@@ -64,7 +64,7 @@ Allwinner's BSP says so in its header.
   CP210x and FTDI, kTLS, BBR and CAKE. `HIDRAW`, `USB_HIDDEV` (UPS monitoring
   over USB) and `PSI` are built in. zswap stays out: swap is zram.
 - **Security.** As in Debian's kernel, AppArmor is the default LSM
-  (`CONFIG_LSM`, no kernel parameter needed), with Yama, Landlock, Lockdown
+  (`CONFIG_LSM`, no kernel parameter needed), with Yama, Landlock
   and the BPF LSM, and `AUDIT` (AppArmor selects it). Hardening as in
   Debian: `FORTIFY_SOURCE`, `HARDENED_USERCOPY`, `INIT_ON_ALLOC_DEFAULT_ON`,
   hardened lists and slab freelists, a shuffled page allocator, a randomised
@@ -72,7 +72,9 @@ Allwinner's BSP says so in its header.
   `EXPORT_BINARY` stays off (it would select `ZSTD_COMPRESS` built in), and
   `IO_STRICT_DEVMEM` stays off, because the image clears the boot chain's
   boot counter in an RTC register through `/dev/mem` while the RTC driver
-  holds that range.
+  holds that range. Lockdown is not part of the config: it needs a verified
+  boot chain to have an effect, and it would require signed modules, which
+  DKMS-built modules on the board are not.
 - **Tracing and BPF.** BTF (`DEBUG_INFO_BTF`, module BTF too), the function
   tracer with fprobe, syscall tracepoints and tc BPF, so `bpftool`,
   `bpftrace` and libbpf CO-RE tools work and systemd's
