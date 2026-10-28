@@ -137,6 +137,13 @@ explanation in its header.
 18. `aic8800_fdrv-count-received-data-frames-in-the-interface-statistics` -
     `rx_packets`/`rx_bytes` were only counted under `CONFIG_BR_SUPPORT`
     (disabled), so a station's receive counters did not follow its traffic.
+19. `aic_load_fw-keep-the-driver-data-of-the-usb-device-alone` - the loader
+    is a USB interface driver but kept its bus structure in the driver data of
+    the USB device, which belongs to the driver bound to the device. With a
+    device tree node on the hub port that is `onboard_usb_dev`, whose
+    disconnect then took the freed bus structure for its own state. The bus
+    handle is now the interface and the bus structure is reached through the
+    interface's driver data.
 
 Several patches add small module parameters or counters under
 `/sys/module/<module>/parameters/` to inject the failure they fix; they are

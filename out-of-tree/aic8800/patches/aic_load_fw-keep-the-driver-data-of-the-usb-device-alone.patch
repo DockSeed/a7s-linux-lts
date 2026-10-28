@@ -1,0 +1,149 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic_load_fw: keep the driver data of the USB device alone
+
+aic_load_fw is a USB interface driver, but aicwf_usb_probe() stored its bus
+structure in the driver data of the USB device (usb_dev->dev is &usb->dev,
+dev_set_drvdata(dev, bus_if)). The driver data of a USB device belongs to the
+driver bound to the device. With a device tree node on the hub port of the
+module, that is onboard_usb_dev, which keeps its struct onboard_dev there
+(onboard_dev_usbdev_probe(), drivers/usb/misc/onboard_usb_dev.c) and reads it
+back in onboard_dev_usbdev_disconnect().
+
+The loader overwrote that pointer on probe. On disconnect the interface is
+unbound first and aicwf_usb_disconnect() frees the bus structure; then
+onboard_dev_usbdev_disconnect() takes the freed memory for its struct
+onboard_dev and locks a mutex in it. Seen on the Radxa Cubie A7S as an oops
+in onboard_dev_usbdev_disconnect() right after "aicwf_usb_disconnect enter"
+in the kernel log.
+
+The bus handle is now the struct device of the USB interface, which is what
+the driver core hands to a USB interface driver. Its driver data already is
+the struct aic_usb_dev (usb_set_intfdata()), and the bus structure is
+reached through usb_dev->bus_if. The bus operations, aicwf_bus_init() and
+aicwf_bus_deinit() and the firmware loader of the Bluetooth part read it
+through aicwf_dev_to_bus() instead of dev_get_drvdata().
+
+usb_dev->dev has no other user in this module: it was only the key for the
+driver data. The firmware is opened by path and request_firmware() gets no
+device, nothing is mapped for DMA and no wiphy parent is set here.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.c
+index f553226..9c6f4ba 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.c
+@@ -35,7 +35,7 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
+         txrx_err("device not found\n");
+         return -1;
+     }
+-    bus_if = dev_get_drvdata(dev);
++    bus_if = aicwf_dev_to_bus(dev);
+     #if defined CONFIG_USB_SUPPORT && defined CONFIG_USB_NO_TRANS_DMA_MAP
+     #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+     bus_if->cmd_buf = usb_alloc_coherent(bus_if->bus_priv.usb->udev, CMD_BUF_MAX, (in_interrupt() ? GFP_ATOMIC : GFP_KERNEL), &bus_if->bus_priv.usb->cmd_dma_trans_addr);
+@@ -94,7 +94,7 @@ void aicwf_bus_deinit(struct device *dev)
+     pr_debug("%s", __func__);
+ 
+ 	mdelay(500);
+-    bus_if = dev_get_drvdata(dev);
++    bus_if = aicwf_dev_to_bus(dev);
+     aicwf_bus_stop(bus_if);
+ 
+     usbdev = bus_if->bus_priv.usb;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.h b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.h
+index d566a11..1759878 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_txrxif.h
+@@ -164,6 +164,18 @@ struct aicwf_rx_priv {
+     struct recv_msdu *recv_frames;
+ };
+ 
++/* The bus handle is the struct device of the USB interface this driver is
++ * bound to. Its driver data is the struct aic_usb_dev, set by
++ * usb_set_intfdata(); the bus is reached through it. The driver data of the
++ * USB device itself belongs to the driver bound to the device.
++ */
++static inline struct aicwf_bus *aicwf_dev_to_bus(struct device *dev)
++{
++    struct aic_usb_dev *usb_dev = dev_get_drvdata(dev);
++
++    return usb_dev ? usb_dev->bus_if : NULL;
++}
++
+ static inline int aicwf_bus_start(struct aicwf_bus *bus)
+ {
+     return bus->ops->start(bus->dev);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
+index 638853f..4f2b712 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
+@@ -306,7 +306,7 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev
+ 	MD5_CTX md5;
+ 	unsigned char decrypt[16];
+ #if defined(CONFIG_PLATFORM_UBUNTU)
+-    struct aicwf_bus *bus_if = dev_get_drvdata(device);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(device);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+ #endif
+ 
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
+index ba4510d..f07c984 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
+@@ -537,7 +537,7 @@ static void aicwf_usb_send_msg_complete(struct urb *urb)
+ static int aicwf_usb_bus_txmsg(struct device *dev, u8 *buf, u32 len)
+ {
+     int ret = 0;
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+ 
+     if (usb_dev->state != USB_UP_ST)
+@@ -705,7 +705,7 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+     struct aicwf_usb_buf *usb_buf;
+     int ret = 0;
+     unsigned long flags;
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+     bool need_cfm = false;
+ 
+@@ -755,7 +755,7 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+ 
+ static int aicwf_usb_bus_start(struct device *dev)
+ {
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+ 
+     if (usb_dev->state == USB_UP_ST)
+@@ -838,7 +838,7 @@ static void aicwf_usb_stop_race_check(struct aic_usb_dev *usb_dev)
+ 
+ static void aicwf_usb_bus_stop(struct device *dev)
+ {
+-    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
++    struct aicwf_bus *bus_if = aicwf_dev_to_bus(dev);
+     struct aic_usb_dev *usb_dev = bus_if->bus_priv.usb;
+     bool race;
+ 
+@@ -1914,7 +1914,10 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
+     }
+ 
+     usb_dev->udev = usb;
+-    usb_dev->dev = &usb->dev;
++    /* The bus handle is the interface, not the USB device: the driver data
++     * of the USB device belongs to the driver bound to the device.
++     */
++    usb_dev->dev = &intf->dev;
+     ret = aicloadfw_chipmatch(usb_dev, id->idVendor, id->idProduct);
+     if (ret) {
+         AICWFDBG(LOGERROR, "%s chip unsupport.\r\n", __func__);
+@@ -1945,7 +1948,6 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
+     bus_if->dev = dev;
+     usb_dev->bus_if = bus_if;
+     bus_if->bus_priv.usb = usb_dev;
+-    dev_set_drvdata(dev, bus_if);
+ 
+     bus_if->ops = &aicwf_usb_bus_ops;
+ 
