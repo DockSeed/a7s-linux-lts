@@ -99,7 +99,7 @@ Assisted-by: Claude
  		status = "okay";
  	};
  
-@@ -1539,22 +1552,22 @@ ohci1: usb@4200400 {
+@@ -1495,22 +1508,22 @@ ohci1: usb@4200400 {
  		 *                  driver does power-gate this domain it must then
  		 *                  treat the per-channel scaler coefficient SRAM as
  		 *                  uninitialised.
@@ -134,7 +134,7 @@ Assisted-by: Claude
  		 */
  		mixer0: mixer@5100000 {
  			compatible = "allwinner,sun60i-a733-de-mixer-0";
-@@ -1569,6 +1582,7 @@ mixer0: mixer@5100000 {
+@@ -1525,6 +1538,7 @@ mixer0: mixer@5100000 {
  			resets = <&ccu RST_BUS_DE0>;
  			assigned-clocks = <&ccu CLK_DE0>;
  			assigned-clock-parents = <&ccu CLK_DE_PLL3X>;

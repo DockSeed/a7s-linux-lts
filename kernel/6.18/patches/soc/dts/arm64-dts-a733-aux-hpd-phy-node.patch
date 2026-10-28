@@ -109,7 +109,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1410,6 +1410,45 @@ combophy0_ss: endpoint {
+@@ -1366,6 +1366,45 @@ combophy0_ss: endpoint {
  			};
  		};
  

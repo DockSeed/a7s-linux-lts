@@ -79,7 +79,7 @@ Assisted-by: Claude
  	/*
  	 * VBUS for the Type-C J4 SuperSpeed port, switched by SGM2576 U2 whose
  	 * enable is USB0-DRVVBUS = PL2 (the "USB0" net name is a schematic label;
-@@ -1406,7 +1421,37 @@ ehci1: usb@4200000 {
+@@ -1375,7 +1390,37 @@ ehci1: usb@4200000 {
  			resets = <&ccu RST_BUS_OHCI1>, <&ccu RST_BUS_EHCI1>;
  			phys = <&usbphy 1>;
  			phy-names = "usb";
@@ -117,7 +117,7 @@ Assisted-by: Claude
  		};
  
  		ohci1: usb@4200400 {
-@@ -2524,6 +2569,18 @@ pmic@36 {
+@@ -2499,6 +2544,18 @@ pmic@36 {
  				#interrupt-cells = <1>;
  
  				regulators {

@@ -133,7 +133,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3084,6 +3084,23 @@ usb_con_sbu: endpoint {
+@@ -3080,6 +3080,23 @@ usb_con_sbu: endpoint {
  			};
  		};
  

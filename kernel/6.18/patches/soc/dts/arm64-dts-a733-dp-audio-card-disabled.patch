@@ -75,7 +75,7 @@ Assisted-by: Claude
  	soc {
  		compatible = "simple-bus";
  		#address-cells = <2>;
-@@ -2024,6 +2068,17 @@ edp0: displayport@5740000 {
+@@ -1993,6 +2037,17 @@ edp0: displayport@5740000 {
  			resets = <&ccu RST_BUS_EDP>;
  			phys = <&aux_hpd>, <&combophy0>;
  			phy-names = "aux-phy", "dp";

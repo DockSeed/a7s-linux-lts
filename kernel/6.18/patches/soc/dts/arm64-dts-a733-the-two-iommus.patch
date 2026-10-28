@@ -55,7 +55,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -985,6 +985,61 @@ gic: interrupt-controller@3400000 {
+@@ -941,6 +941,61 @@ gic: interrupt-controller@3400000 {
  			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
  		};
  

@@ -33,7 +33,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -838,6 +838,32 @@ uart0_pb_pins: uart0-pb-pins {
+@@ -807,6 +807,32 @@ uart0_pb_pins: uart0-pb-pins {
  				function = "uart0";
  			};
  
@@ -66,7 +66,7 @@ Assisted-by: Claude
  			uart1_pg_pins: uart1-pg-pins {
  				pins = "PG6", "PG7";
  				allwinner,pinmux = <2>;
-@@ -2540,6 +2566,117 @@ dma: dma-controller@4601000 {
+@@ -2509,6 +2535,117 @@ dma: dma-controller@4601000 {
  			#dma-cells = <1>;
  		};
  

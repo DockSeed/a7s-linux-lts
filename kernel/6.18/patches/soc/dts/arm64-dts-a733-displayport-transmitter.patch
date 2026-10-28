@@ -70,7 +70,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1259,6 +1259,55 @@ ohci1: usb@4200400 {
+@@ -1215,6 +1215,55 @@ ohci1: usb@4200400 {
  		 * INTID 185 is PCIE0_MSI, so GIC_SPI numbers and INTIDs must
  		 * not be mixed.
  		 */

@@ -28,7 +28,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2430,9 +2430,11 @@ r_ccu: clock-controller@7010000 {
+@@ -2396,9 +2396,11 @@ r_ccu: clock-controller@7010000 {
  			reg = <0x0 0x07010000 0x0 0x250>;
  			clocks = <&osc24M>, <&osc32k>, <&iosc>,
  				 <&ccu CLK_PLL_PERI0_200M>,

@@ -41,7 +41,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3358,6 +3358,13 @@ cluster0_opp: opp-table-cluster0 {
+@@ -3354,6 +3354,13 @@ cluster0_opp: opp-table-cluster0 {
  		nvmem-cells = <&cpu_speed_grade>;
  		opp-shared;
  
@@ -55,7 +55,7 @@ Assisted-by: Claude
  		/*
  		 * Two points below the vendor's floor. The vendor's lowest is
  		 * 416 MHz; these are ours, and they exist because the whole
-@@ -3382,6 +3389,7 @@ cluster0_opp: opp-table-cluster0 {
+@@ -3378,6 +3385,7 @@ cluster0_opp: opp-table-cluster0 {
  		 */
  		opp-247000000 {
  			opp-hz = /bits/ 64 <247000000>;
@@ -63,7 +63,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3390,6 +3398,7 @@ opp-247000000 {
+@@ -3386,6 +3394,7 @@ opp-247000000 {
  
  		opp-494000000 {
  			opp-hz = /bits/ 64 <494000000>;
@@ -71,7 +71,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3398,6 +3407,7 @@ opp-494000000 {
+@@ -3394,6 +3403,7 @@ opp-494000000 {
  
  		opp-416000000 {
  			opp-hz = /bits/ 64 <416000000>;
@@ -79,7 +79,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3406,6 +3416,7 @@ opp-416000000 {
+@@ -3402,6 +3412,7 @@ opp-416000000 {
  
  		opp-780000000 {
  			opp-hz = /bits/ 64 <780000000>;
@@ -87,7 +87,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3414,6 +3425,7 @@ opp-780000000 {
+@@ -3410,6 +3421,7 @@ opp-780000000 {
  
  		opp-1014000000 {
  			opp-hz = /bits/ 64 <1014000000>;
@@ -95,7 +95,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3422,6 +3434,7 @@ opp-1014000000 {
+@@ -3418,6 +3430,7 @@ opp-1014000000 {
  
  		opp-1196000000 {
  			opp-hz = /bits/ 64 <1196000000>;
@@ -103,7 +103,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <850000 850000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3430,6 +3443,7 @@ opp-1196000000 {
+@@ -3426,6 +3439,7 @@ opp-1196000000 {
  
  		opp-1404000000 {
  			opp-hz = /bits/ 64 <1404000000>;
@@ -111,7 +111,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <950000 950000 1050000>;
  			opp-microvolt-speed4 = <840000 840000 1050000>;
-@@ -3438,6 +3452,7 @@ opp-1404000000 {
+@@ -3434,6 +3448,7 @@ opp-1404000000 {
  
  		opp-1508000000 {
  			opp-hz = /bits/ 64 <1508000000>;
@@ -119,7 +119,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1000000 1000000 1050000>;
  			opp-microvolt-speed4 = <880000 880000 1050000>;
-@@ -3446,6 +3461,7 @@ opp-1508000000 {
+@@ -3442,6 +3457,7 @@ opp-1508000000 {
  
  		opp-1612000000 {
  			opp-hz = /bits/ 64 <1612000000>;
@@ -127,7 +127,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <920000 920000 1050000>;
-@@ -3454,6 +3470,7 @@ opp-1612000000 {
+@@ -3450,6 +3466,7 @@ opp-1612000000 {
  
  		opp-1716000000 {
  			opp-hz = /bits/ 64 <1716000000>;
@@ -135,7 +135,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <960000 960000 1050000>;
-@@ -3462,6 +3479,7 @@ opp-1716000000 {
+@@ -3458,6 +3475,7 @@ opp-1716000000 {
  
  		opp-1794000000 {
  			opp-hz = /bits/ 64 <1794000000>;
@@ -143,7 +143,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
-@@ -3530,6 +3548,7 @@ cluster1_opp: opp-table-cluster1 {
+@@ -3526,6 +3544,7 @@ cluster1_opp: opp-table-cluster1 {
  		 */
  		opp-247000000 {
  			opp-hz = /bits/ 64 <247000000>;
@@ -151,7 +151,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3538,6 +3557,7 @@ opp-247000000 {
+@@ -3534,6 +3553,7 @@ opp-247000000 {
  
  		opp-494000000 {
  			opp-hz = /bits/ 64 <494000000>;
@@ -159,7 +159,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3546,6 +3566,7 @@ opp-494000000 {
+@@ -3542,6 +3562,7 @@ opp-494000000 {
  
  		opp-416000000 {
  			opp-hz = /bits/ 64 <416000000>;
@@ -167,7 +167,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3554,6 +3575,7 @@ opp-416000000 {
+@@ -3550,6 +3571,7 @@ opp-416000000 {
  
  		opp-780000000 {
  			opp-hz = /bits/ 64 <780000000>;
@@ -175,7 +175,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3562,6 +3584,7 @@ opp-780000000 {
+@@ -3558,6 +3580,7 @@ opp-780000000 {
  
  		opp-1014000000 {
  			opp-hz = /bits/ 64 <1014000000>;
@@ -183,7 +183,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3570,6 +3593,7 @@ opp-1014000000 {
+@@ -3566,6 +3589,7 @@ opp-1014000000 {
  
  		opp-1196000000 {
  			opp-hz = /bits/ 64 <1196000000>;
@@ -191,7 +191,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3578,6 +3602,7 @@ opp-1196000000 {
+@@ -3574,6 +3598,7 @@ opp-1196000000 {
  
  		opp-1404000000 {
  			opp-hz = /bits/ 64 <1404000000>;
@@ -199,7 +199,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <850000 850000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3586,6 +3611,7 @@ opp-1404000000 {
+@@ -3582,6 +3607,7 @@ opp-1404000000 {
  
  		opp-1508000000 {
  			opp-hz = /bits/ 64 <1508000000>;
@@ -207,7 +207,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <900000 900000 1050000>;
  			opp-microvolt-speed4 = <820000 820000 1050000>;
-@@ -3594,6 +3620,7 @@ opp-1508000000 {
+@@ -3590,6 +3616,7 @@ opp-1508000000 {
  
  		opp-1612000000 {
  			opp-hz = /bits/ 64 <1612000000>;
@@ -215,7 +215,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <950000 950000 1050000>;
  			opp-microvolt-speed4 = <840000 840000 1050000>;
-@@ -3602,6 +3629,7 @@ opp-1612000000 {
+@@ -3598,6 +3625,7 @@ opp-1612000000 {
  
  		opp-1716000000 {
  			opp-hz = /bits/ 64 <1716000000>;
@@ -223,7 +223,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1000000 1000000 1050000>;
  			opp-microvolt-speed4 = <870000 870000 1050000>;
-@@ -3610,6 +3638,7 @@ opp-1716000000 {
+@@ -3606,6 +3634,7 @@ opp-1716000000 {
  
  		opp-1794000000 {
  			opp-hz = /bits/ 64 <1794000000>;
@@ -231,7 +231,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <920000 920000 1050000>;
-@@ -3618,6 +3647,7 @@ opp-1794000000 {
+@@ -3614,6 +3643,7 @@ opp-1794000000 {
  
  		opp-1898000000 {
  			opp-hz = /bits/ 64 <1898000000>;
@@ -239,7 +239,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <970000 970000 1050000>;
-@@ -3626,6 +3656,7 @@ opp-1898000000 {
+@@ -3622,6 +3652,7 @@ opp-1898000000 {
  
  		opp-1950000000 {
  			opp-hz = /bits/ 64 <1950000000>;
@@ -247,7 +247,7 @@ Assisted-by: Claude
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
-@@ -3634,6 +3665,7 @@ opp-1950000000 {
+@@ -3630,6 +3661,7 @@ opp-1950000000 {
  
  		opp-2002000000 {
  			opp-hz = /bits/ 64 <2002000000>;

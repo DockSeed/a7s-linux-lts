@@ -136,7 +136,7 @@ Assisted-by: Claude
  			clock-names = "apb", "hosc", "losc";
  			gpio-controller;
  			#gpio-cells = <3>;
-@@ -944,7 +944,7 @@ rgmii0_pins: rgmii0-pins {
+@@ -913,7 +913,7 @@ rgmii0_pins: rgmii0-pins {
  		ccu: clock-controller@2002000 {
  			compatible = "allwinner,sun60i-a733-ccu";
  			reg = <0x0 0x02002000 0x0 0x2000>;
@@ -145,7 +145,7 @@ Assisted-by: Claude
  				 <&dcxo26M>;
  			clock-names = "hosc", "losc", "iosc", "dcxo";
  			#clock-cells = <1>;
-@@ -1062,7 +1062,7 @@ wdt: watchdog@2050000 {
+@@ -1031,7 +1031,7 @@ wdt: watchdog@2050000 {
  				     "allwinner,sun55i-a523-wdt";
  			reg = <0x0 0x02050000 0x0 0x20>;
  			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
@@ -154,7 +154,7 @@ Assisted-by: Claude
  			clock-names = "hosc", "losc";
  			status = "disabled";
  		};
-@@ -2572,7 +2572,7 @@ gmac0_syscon: syscon@4508000 {
+@@ -2538,7 +2538,7 @@ gmac0_syscon: syscon@4508000 {
  		r_ccu: clock-controller@7010000 {
  			compatible = "allwinner,sun60i-a733-r-ccu";
  			reg = <0x0 0x07010000 0x0 0x250>;
@@ -163,7 +163,7 @@ Assisted-by: Claude
  				 <&ccu CLK_PLL_PERI0_200M>,
  				 <&ccu CLK_PLL_PERI0_300M>,
  				 <&dcxo26M>;
-@@ -2628,7 +2628,7 @@ r_watchdog: watchdog@7021000 {
+@@ -2594,7 +2594,7 @@ r_watchdog: watchdog@7021000 {
  				     "allwinner,sun55i-a523-wdt";
  			reg = <0x0 0x07021000 0x0 0x20>;
  			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
@@ -172,7 +172,7 @@ Assisted-by: Claude
  			clock-names = "hosc", "losc";
  		};
  
-@@ -2638,7 +2638,7 @@ r_pio: pinctrl@7025000 {
+@@ -2604,7 +2604,7 @@ r_pio: pinctrl@7025000 {
  			reg = <0x0 0x07025000 0x0 0x800>;
  			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
  				     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>;
@@ -181,7 +181,7 @@ Assisted-by: Claude
  			clock-names = "apb", "hosc", "losc";
  			gpio-controller;
  			#gpio-cells = <3>;
-@@ -3090,15 +3090,26 @@ usb_con_sbu: endpoint {
+@@ -3086,15 +3086,26 @@ usb_con_sbu: endpoint {
  		 * Linear 16-bit day counter plus hour/minute/second (9.1.7.5,
  		 * 9.1.7.6): the r329 fallback selects that layout in rtc-sun6i.
  		 * One interrupt, RTC_ALARM = INTID 228 = SPI 196 (UM 12, IRQ

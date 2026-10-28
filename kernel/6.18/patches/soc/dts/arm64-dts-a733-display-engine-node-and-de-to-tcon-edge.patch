@@ -368,7 +368,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1242,23 +1242,271 @@ ohci1: usb@4200400 {
+@@ -1198,23 +1198,271 @@ ohci1: usb@4200400 {
  		};
  
  		/*
@@ -654,7 +654,7 @@ Assisted-by: Claude
  		/*
  		 * TCON_TV1 -- the timing controller that scans the mode and hands it
  		 * to the DisplayPort transmitter. UM 15.2: TCON_TV1 is the TCON that drives
-@@ -1314,6 +1562,37 @@ tcon_tv1: lcd-controller@5731000 {
+@@ -1270,6 +1518,37 @@ tcon_tv1: lcd-controller@5731000 {
  			assigned-clocks = <&ccu CLK_EDP_TV>;
  			assigned-clock-parents = <&ccu CLK_VIDEO1_PLL4X>;
  			status = "okay";
@@ -692,7 +692,7 @@ Assisted-by: Claude
  		};
  
  		/*
-@@ -1394,6 +1673,24 @@ edp0: displayport@5740000 {
+@@ -1350,6 +1629,24 @@ edp0: displayport@5740000 {
  			status = "okay";
  		};
  

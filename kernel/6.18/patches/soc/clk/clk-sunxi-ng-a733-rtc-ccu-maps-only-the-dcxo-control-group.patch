@@ -65,7 +65,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3088,10 +3088,14 @@ usb_con_sbu: endpoint {
+@@ -3084,10 +3084,14 @@ usb_con_sbu: endpoint {
  		 * RTC-CCU (PRCM @0x07090000, AON domain). Provides the two SERDES
  		 * DCXO gates (XO_CTRL1 @0x16c bit4/5); the COMB0 combo-PHY consumes
  		 * dcxo-serdes0. Parent = r-ahb (from the R-CCU). Driver = patch `clk-sunxi-ng-a733-add-minimal-rtc-ccu`.

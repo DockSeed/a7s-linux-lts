@@ -39,21 +39,9 @@ no longer rewrites its CFG register.
 
 Assisted-by: Claude
 ---
-diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
---- a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
-@@ -96,7 +96,6 @@
- 	.io_bias_field_shift = a733_io_bias_field_shift,
- 	.irq_banks = ARRAY_SIZE(a733_irq_bank_map),
- 	.irq_bank_map = a733_irq_bank_map,
--	.irq_read_needs_mux = true,
- 	.irq_cfg_reg = A733_IRQ_CFG_REG,
- 	.irq_ctrl_reg = A733_IRQ_CTRL_REG,
- 	.irq_status_reg = A733_IRQ_STATUS_REG,
-diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2-r.c b/drivers/pinctrl/sunxi/pinctrl-sun60iw2-r.c
 --- a/drivers/pinctrl/sunxi/pinctrl-sun60iw2-r.c
 +++ b/drivers/pinctrl/sunxi/pinctrl-sun60iw2-r.c
-@@ -64,7 +64,6 @@
+@@ -64,7 +64,6 @@ static const u8 a733_r_io_bias_field_shift[SUNXI_PINCTRL_MAX_BANKS] = {
  static struct sunxi_pinctrl_desc a733_r_pinctrl_data = {
  	.irq_banks = ARRAY_SIZE(a733_r_irq_bank_map),
  	.irq_bank_map = a733_r_irq_bank_map,
@@ -61,3 +49,13 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2-r.c b/drivers/pinctrl/sunxi/p
  	.io_bias_cfg_variant = BIAS_VOLTAGE_POW_MOD_SEL_2BIT,
  	.io_bias_field_shift = a733_r_io_bias_field_shift,
  	.pin_base = PL_BASE,
+--- a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
+@@ -101,7 +101,6 @@ static struct sunxi_pinctrl_desc a733_pinctrl_data = {
+ 	.io_bias_field_shift = a733_io_bias_field_shift,
+ 	.irq_banks = ARRAY_SIZE(a733_irq_bank_map),
+ 	.irq_bank_map = a733_irq_bank_map,
+-	.irq_read_needs_mux = true,
+ 	.irq_cfg_reg = A733_IRQ_CFG_REG,
+ 	.irq_ctrl_reg = A733_IRQ_CTRL_REG,
+ 	.irq_status_reg = A733_IRQ_STATUS_REG,

@@ -1,0 +1,160 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] pinctrl: sunxi: a733: Set the withstand mode of bank PF with its supply
+
+Bank PF of the A733 switches between its 3.3 V and 1.8 V supply in
+GPIO_POW_VAL_SET_CTL, but its withstand mode in GPIO_POW_MOD_SEL bits 11:10
+stays where the boot chain left it. In the adaptive mode (01) the pads
+follow the SoC's own detector of the bank supply, and on the Cubie A7S that
+detector can report 3.3 V while the bank runs at 1.8 V. An SD card at
+SDR104 then fails its first transfers after a rebind.
+
+Set the mode by hand together with the supply, so that the 1.8 V mode is
+never active while the bank selects 3.3 V: the 3.3 V mode (10) before the
+switch to 3.3 V, the 1.8 V mode (11) after the switch to 1.8 V, once
+GPIO_POW_VAL reports the bank at 1.8 V and the bank still selects 1.8 V. If
+the detector does not report 1.8 V within 1 ms, the bank keeps the 3.3 V
+mode and a warning is printed. At probe the mode is set from the supply the
+bank selects, so it no longer depends on the boot chain.
+
+Bank PF is thereby not written from its vcc-pf-supply by the two-bit
+POW_MOD_SEL variant (`pinctrl-sunxi-a733-2-bit-pow-mod-sel-io-bias` marks
+it NO_FIELD): its supply is switched by the kernel, so its mode is too.
+
+Assisted-by: Claude
+---
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -10,11 +10,13 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#include <linux/bitfield.h>
+ #include <linux/clk.h>
+ #include <linux/export.h>
+ #include <linux/gpio/driver.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/iopoll.h>
+ #include <linux/irqchip/chained_irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+@@ -653,6 +655,62 @@ static int sunxi_pconf_group_get(struct pinctrl_dev *pctldev,
+ 	return sunxi_pconf_get(pctldev, g->pin, config);
+ }
+ 
++/* Called with pctl->lock held. */
++static void sunxi_pf_write_withstand(struct sunxi_pinctrl *pctl, u32 mode)
++{
++	u32 reg = readl(pctl->membase + pctl->pow_mod_sel_offset);
++
++	reg &= ~A733_POW_PF_FIELD;
++	reg |= FIELD_PREP(A733_POW_PF_FIELD, mode);
++	writel(reg, pctl->membase + pctl->pow_mod_sel_offset);
++}
++
++/*
++ * Bank PF's withstand mode has to match its supply. Set the 1.8 V mode
++ * only once the bank's supply detector reports 1.8 V, and only while the
++ * bank still selects 1.8 V; otherwise keep the 3.3 V mode.
++ */
++static void sunxi_pf_withstand_1v8(struct sunxi_pinctrl *pctl)
++{
++	u32 mode = A733_POW_PF_1V8;
++	unsigned long flags;
++	u32 reg;
++
++	if (readl_poll_timeout_atomic(pctl->membase + A733_POW_VAL_REG, reg,
++				      FIELD_GET(A733_POW_PF_FIELD, reg) ==
++				      A733_POW_PF_1V8, 10, 1000)) {
++		dev_warn(pctl->dev,
++			 "bank PF supply not at 1.8 V (0x%08x), keeping 3.3 V withstand mode\n",
++			 reg);
++		mode = A733_POW_PF_3V3;
++	}
++
++	raw_spin_lock_irqsave(&pctl->lock, flags);
++	reg = readl(pctl->membase + A733_POW_VAL_SET_CTL_REG);
++	if (!(reg & BIT(0)))
++		sunxi_pf_write_withstand(pctl, mode);
++	raw_spin_unlock_irqrestore(&pctl->lock, flags);
++}
++
++/* Bring bank PF's withstand mode in line with the supply it selects. */
++static void sunxi_pf_withstand_init(struct sunxi_pinctrl *pctl)
++{
++	unsigned long flags;
++
++	if (!pctl->desc->pf_power_switch)
++		return;
++
++	raw_spin_lock_irqsave(&pctl->lock, flags);
++	if (readl(pctl->membase + A733_POW_VAL_SET_CTL_REG) & BIT(0)) {
++		sunxi_pf_write_withstand(pctl, A733_POW_PF_3V3);
++		raw_spin_unlock_irqrestore(&pctl->lock, flags);
++		return;
++	}
++	raw_spin_unlock_irqrestore(&pctl->lock, flags);
++
++	sunxi_pf_withstand_1v8(pctl);
++}
++
+ /*
+  * PIN_CONFIG_POWER_SOURCE for the bank PF I/O voltage (A733).
+  *
+@@ -666,6 +724,9 @@ static int sunxi_pconf_group_get(struct pinctrl_dev *pctldev,
+  * Register GPIO_POW_VAL_SET_CTL bit 0 = VCC_PF_PWR_VOL_SEL, 0 = 1.8 V /
+  * 1 = 3.3 V (A733 UM v0.92). Note that the polarity is the opposite of the io-bias
+  * code below: here 1.8 V clears bit 0.
++ *
++ * The bank's withstand mode follows the supply: the 3.3 V mode before the
++ * switch to 3.3 V, the 1.8 V mode after the switch to 1.8 V.
+  */
+ static int sunxi_pconf_set_power_source(struct sunxi_pinctrl *pctl,
+ 					unsigned pin, u32 arg)
+@@ -691,6 +752,8 @@ static int sunxi_pconf_set_power_source(struct sunxi_pinctrl *pctl,
+ 	}
+ 
+ 	raw_spin_lock_irqsave(&pctl->lock, flags);
++	if (arg != 1800000)
++		sunxi_pf_write_withstand(pctl, A733_POW_PF_3V3);
+ 	before = readl(pctl->membase + A733_POW_VAL_SET_CTL_REG);
+ 	val = before;
+ 	if (arg == 1800000)
+@@ -709,6 +772,9 @@ static int sunxi_pconf_set_power_source(struct sunxi_pinctrl *pctl,
+ 		"power-source: pin %u arg %u uV -- POW_VAL_SET_CTL %#010x -> %#010x (bit0 %u -> %u)\n",
+ 		pin, arg, before, val, before & 1, val & 1);
+ 
++	if (arg == 1800000)
++		sunxi_pf_withstand_1v8(pctl);
++
+ 	return 0;
+ }
+ 
+@@ -1764,6 +1830,8 @@ int sunxi_pinctrl_init_with_flags(struct platform_device *pdev,
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
+ 
++	sunxi_pf_withstand_init(pctl);
++
+ 	/*
+ 	 * Seed the output latch shadow from the hardware so pins the
+ 	 * bootloader left in output mode keep their state; see
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -76,6 +76,16 @@
+  * for the SD UHS 1.8 V signalling switch.
+  */
+ #define A733_POW_VAL_SET_CTL_REG	0x70
++/*
++ * GPIO_POW_VAL (read only): the SoC's own detector of each bank's supply. The
++ * field of bank PF is 11:10, 0b10 = 3.3 V, 0b11 = 1.8 V. GPIO_POW_MOD_SEL has
++ * the withstand mode of bank PF at the same bits, 0b10 = 3.3 V mode, 0b11 =
++ * 1.8 V mode, 0b01 = adaptive (follows the detector).
++ */
++#define A733_POW_VAL_REG		0x48
++#define A733_POW_PF_FIELD		GENMASK(11, 10)
++#define A733_POW_PF_3V3			2
++#define A733_POW_PF_1V8			3
+ 
+ /*
+  * GPIO_POW_MOD_SEL (main PIO 0x0040) and SGPIO_POW_MOD_SEL (S_GPIO 0x0340)

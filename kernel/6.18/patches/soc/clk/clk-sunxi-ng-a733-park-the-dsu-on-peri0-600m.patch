@@ -100,7 +100,7 @@ Assisted-by: Claude
  
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3188,8 +3188,12 @@ rtc_ccu: clock-controller@709015c {
+@@ -3184,8 +3184,12 @@ rtc_ccu: clock-controller@709015c {
  		cpupll_ccu: clock-controller@8870000 {
  			compatible = "allwinner,sun60i-a733-cpu-ccu";
  			reg = <0x0 0x08870000 0x0 0x3038>;

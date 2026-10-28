@@ -57,7 +57,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3362,25 +3362,27 @@ / {
+@@ -3358,25 +3358,27 @@ / {
  	 * 416 MHz is the only step using EXT_DIVP = /2; 26*16 would put
  	 * the VCO under the documented 480 MHz floor.
  	 *
@@ -104,7 +104,7 @@ Assisted-by: Claude
  	 *
  	 * Bit 1 (vf0100) is also the fallback: the driver gives it to every
  	 * die it cannot identify, as the vendor does since 1.5.0. Fuse 0x00
-@@ -3435,8 +3437,14 @@ opp-247000000 {
+@@ -3431,8 +3433,14 @@ opp-247000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -119,7 +119,7 @@ Assisted-by: Claude
  		};
  
  		opp-494000000 {
-@@ -3444,8 +3452,14 @@ opp-494000000 {
+@@ -3440,8 +3448,14 @@ opp-494000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -134,7 +134,7 @@ Assisted-by: Claude
  		};
  
  		opp-416000000 {
-@@ -3453,8 +3467,14 @@ opp-416000000 {
+@@ -3449,8 +3463,14 @@ opp-416000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -149,7 +149,7 @@ Assisted-by: Claude
  		};
  
  		opp-780000000 {
-@@ -3462,8 +3482,14 @@ opp-780000000 {
+@@ -3458,8 +3478,14 @@ opp-780000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -164,7 +164,7 @@ Assisted-by: Claude
  		};
  
  		opp-1014000000 {
-@@ -3471,8 +3497,14 @@ opp-1014000000 {
+@@ -3467,8 +3493,14 @@ opp-1014000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -179,7 +179,7 @@ Assisted-by: Claude
  		};
  
  		opp-1196000000 {
-@@ -3480,8 +3512,14 @@ opp-1196000000 {
+@@ -3476,8 +3508,14 @@ opp-1196000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <850000 850000 1050000>;
@@ -194,7 +194,7 @@ Assisted-by: Claude
  		};
  
  		opp-1404000000 {
-@@ -3489,8 +3527,14 @@ opp-1404000000 {
+@@ -3485,8 +3523,14 @@ opp-1404000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <950000 950000 1050000>;
@@ -209,7 +209,7 @@ Assisted-by: Claude
  		};
  
  		opp-1508000000 {
-@@ -3498,8 +3542,12 @@ opp-1508000000 {
+@@ -3494,8 +3538,12 @@ opp-1508000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x00300036>;
  			opp-microvolt = <1000000 1000000 1050000>;
@@ -222,7 +222,7 @@ Assisted-by: Claude
  		};
  
  		opp-1612000000 {
-@@ -3507,8 +3555,12 @@ opp-1612000000 {
+@@ -3503,8 +3551,12 @@ opp-1612000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x00300036>;
  			opp-microvolt = <1050000 1050000 1050000>;
@@ -235,7 +235,7 @@ Assisted-by: Claude
  		};
  
  		opp-1716000000 {
-@@ -3516,8 +3568,11 @@ opp-1716000000 {
+@@ -3512,8 +3564,11 @@ opp-1716000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x00300034>;
  			opp-microvolt = <1050000 1050000 1050000>;
@@ -247,7 +247,7 @@ Assisted-by: Claude
  		};
  
  		opp-1794000000 {
-@@ -3525,8 +3580,11 @@ opp-1794000000 {
+@@ -3521,8 +3576,11 @@ opp-1794000000 {
  			clock-latency-ns = <45000>;
  			opp-supported-hw = <0x00300034>;
  			opp-microvolt = <1050000 1050000 1050000>;
@@ -259,7 +259,7 @@ Assisted-by: Claude
  		};
  
  	};
-@@ -3543,25 +3601,27 @@ opp-1794000000 {
+@@ -3539,25 +3597,27 @@ opp-1794000000 {
  	 * 416 MHz is the only step using EXT_DIVP = /2; 26*16 would put
  	 * the VCO under the documented 480 MHz floor.
  	 *
@@ -306,7 +306,7 @@ Assisted-by: Claude
  	 *
  	 * Bit 1 (vf0100) is also the fallback: the driver gives it to every
  	 * die it cannot identify, as the vendor does since 1.5.0. Fuse 0x00
-@@ -3604,8 +3664,14 @@ opp-247000000 {
+@@ -3600,8 +3660,14 @@ opp-247000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -321,7 +321,7 @@ Assisted-by: Claude
  		};
  
  		opp-494000000 {
-@@ -3613,8 +3679,14 @@ opp-494000000 {
+@@ -3609,8 +3675,14 @@ opp-494000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -336,7 +336,7 @@ Assisted-by: Claude
  		};
  
  		opp-416000000 {
-@@ -3622,8 +3694,14 @@ opp-416000000 {
+@@ -3618,8 +3690,14 @@ opp-416000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -351,7 +351,7 @@ Assisted-by: Claude
  		};
  
  		opp-780000000 {
-@@ -3631,8 +3709,14 @@ opp-780000000 {
+@@ -3627,8 +3705,14 @@ opp-780000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -366,7 +366,7 @@ Assisted-by: Claude
  		};
  
  		opp-1014000000 {
-@@ -3640,8 +3724,14 @@ opp-1014000000 {
+@@ -3636,8 +3720,14 @@ opp-1014000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -381,7 +381,7 @@ Assisted-by: Claude
  		};
  
  		opp-1196000000 {
-@@ -3649,8 +3739,14 @@ opp-1196000000 {
+@@ -3645,8 +3735,14 @@ opp-1196000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <800000 800000 1050000>;
@@ -396,7 +396,7 @@ Assisted-by: Claude
  		};
  
  		opp-1404000000 {
-@@ -3658,8 +3754,14 @@ opp-1404000000 {
+@@ -3654,8 +3750,14 @@ opp-1404000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <850000 850000 1050000>;
@@ -411,7 +411,7 @@ Assisted-by: Claude
  		};
  
  		opp-1508000000 {
-@@ -3667,8 +3769,14 @@ opp-1508000000 {
+@@ -3663,8 +3765,14 @@ opp-1508000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <900000 900000 1050000>;
@@ -426,7 +426,7 @@ Assisted-by: Claude
  		};
  
  		opp-1612000000 {
-@@ -3676,8 +3784,14 @@ opp-1612000000 {
+@@ -3672,8 +3780,14 @@ opp-1612000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x0030007e>;
  			opp-microvolt = <950000 950000 1050000>;
@@ -441,7 +441,7 @@ Assisted-by: Claude
  		};
  
  		opp-1716000000 {
-@@ -3685,8 +3799,12 @@ opp-1716000000 {
+@@ -3681,8 +3795,12 @@ opp-1716000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x00300036>;
  			opp-microvolt = <1000000 1000000 1050000>;
@@ -454,7 +454,7 @@ Assisted-by: Claude
  		};
  
  		opp-1794000000 {
-@@ -3694,8 +3812,12 @@ opp-1794000000 {
+@@ -3690,8 +3808,12 @@ opp-1794000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x00300036>;
  			opp-microvolt = <1050000 1050000 1050000>;
@@ -467,7 +467,7 @@ Assisted-by: Claude
  		};
  
  		opp-1898000000 {
-@@ -3703,8 +3825,11 @@ opp-1898000000 {
+@@ -3699,8 +3821,11 @@ opp-1898000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x00300034>;
  			opp-microvolt = <1050000 1050000 1050000>;
@@ -479,7 +479,7 @@ Assisted-by: Claude
  		};
  
  		opp-1950000000 {
-@@ -3714,6 +3839,8 @@ opp-1950000000 {
+@@ -3710,6 +3835,8 @@ opp-1950000000 {
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
  			opp-microvolt-speed5 = <970000 970000 1050000>;
@@ -488,7 +488,7 @@ Assisted-by: Claude
  		};
  
  		opp-2002000000 {
-@@ -3721,8 +3848,11 @@ opp-2002000000 {
+@@ -3717,8 +3844,11 @@ opp-2002000000 {
  			clock-latency-ns = <38000>;
  			opp-supported-hw = <0x00300034>;
  			opp-microvolt = <1050000 1050000 1050000>;

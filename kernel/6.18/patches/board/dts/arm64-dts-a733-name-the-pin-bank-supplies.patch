@@ -1,0 +1,167 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] arm64: dts: a733: name the pin banks' I/O supplies
+
+Seven pin banks logged a dummy regulator and "Couldn't set bank P? I/O
+bias: -22" on every boot. A bank without a vcc-pX-supply property gets the
+dummy regulator, whose voltage cannot be read, so the pin driver cannot set
+the bank's withstand mode and says so. Name the supplies from the schematic
+(V1.10):
+
+  PB    VCC-IO, SWOUT2. PB has no POW_MOD_SEL field of its own, so the
+        driver leaves it alone; the property only replaces the dummy.
+  PC    VCC-PC, CLDO5 at 1.8 V. The eMMC consumes the same rail as vqmmc.
+  PD    VCC33-LCD, SWOUT1, through R251 (0R). BLDO2 carries a VCC-PD label
+        but its output does not reach the SoC ball.
+  PE PK BLDO1, which also feeds VCC-MCSI.
+  PF    VCC-IO (SWOUT2) or VCC18-PF (CLDO5), selected by the power-source
+        of its pin groups; it names VCC-IO, the selection after reset. The
+        withstand mode of PF follows the switch, not this property.
+  PG    VCC-PG is tied to VCC-PL through RA3: ALDO1.
+  PH    VCC-PH, SWOUT2. Without the phandle the bank finds the rail by its
+        regulator-name, without a log line and only if it is registered by
+        then, so GPIO_POW_MOD_SEL came up in the adaptive mode in some boots
+        and in the 3.3 V mode in others. With it a rail that is not there yet
+        defers gmac0, and the mode is the same in every boot.
+  PJ    VCC33-LCD, SWOUT1, no series part.
+  PM    (r_pio) The VCC-PM ball reaches VCC-PL (ALDO1) through RA13 (0R).
+        The net named VCC-PM on CLDO1 does not reach the SoC, a CLDO1
+        phandle would write the 1.8 V mode onto a 3.3 V bank.
+
+Add ALDO1 as vcc-pl-pg-pm and BLDO1 as vcc-pe-pk-mcsi, both always on and
+without a voltage window like the other rails of the PMIC: ALDO1 feeds bank
+PL, which the PMIC's own I2C bus runs on, and nothing consumes VCC-MCSI, so
+the regulator core would switch BLDO1 off after boot. ALDO1 is not called
+vcc-pl: a bank without a phandle looks a rail up by the name of its supply,
+and bank PL has none.
+
+Bank PL stays without a supply. Its consumer is r_i2c0 (PL0/PL1), the bus
+the PMIC sits on, and it requests its pins before the PMIC exists, so a
+vcc-pl-supply from ALDO1 would defer the controller that has to probe first
+for ALDO1 to exist. It keeps the dummy regulator and its two log lines.
+
+The A733 r-pinctrl has its own driver, so the comment on the r_pio node
+that described the A523 driver's one-bit write is replaced.
+
+This replaces `arm64-dts-a733-bank-pc-io-supply` and
+`arm64-dts-a733-bank-ph-io-supply`, which named PC and PH; this patch names
+the remaining banks from the schematic.
+
+Assisted-by: Claude
+---
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
+@@ -671,6 +671,52 @@ pio: pinctrl@2000000 {
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+ 
++			/*
++			 * Pin bank supplies. The pin driver puts each bank's withstand
++			 * mode where its supply voltage says (two-bit GPIO_POW_MOD_SEL,
++			 * UM V1.00 18.14.6.1), and a bank without a supply property takes
++			 * the dummy regulator and logs it. Rails per the schematic V1.10:
++			 *
++			 *  - PB: VCC-IO, SWOUT2. PB has no field of its own: the UM names
++			 *    bits 25:24 VCCIO_PWR_MOD_SEL without tying them to a bank,
++			 *    and a733_io_bias_field_shift[] marks PB NO_FIELD. The
++			 *    property only replaces the dummy regulator, no register is
++			 *    written.
++			 *  - PC: VCC-PC, CLDO5, 1.8 V (the eMMC consumes the same rail as
++			 *    vqmmc).
++			 *  - PD: VCC33-LCD, SWOUT1: ball 1N7 reaches it through R251
++			 *    (0R), not through BLDO2, whose output only carries a VCC-PD
++			 *    label.
++			 *  - PE, PK: BLDO1, which also feeds VCC-MCSI.
++			 *  - PF: VCC-IO (SWOUT2) or VCC18-PF (CLDO5), selected by the
++			 *    power-source of its pin groups. The property names VCC-IO,
++			 *    the selection after reset. The withstand mode of PF is not
++			 *    written from it, it follows the switch (NO_FIELD).
++			 *  - PG: VCC-PG is tied to VCC-PL through RA3, ALDO1.
++			 *  - PH: VCC-PH, SWOUT2, 3.3 V. Without the phandle the bank
++			 *    still finds a rail named "vcc-ph", but only if it is
++			 *    registered by then, without a log line, and GPIO_POW_MOD_SEL
++			 *    15:14 came up 01 (adaptive) in some boots and 10 (3.3 V) in
++			 *    others. With the phandle a rail that is not there yet defers
++			 *    the consumer (gmac0) and the mode is the same in every boot.
++			 *  - PJ: VCC33-LCD, SWOUT1, no series part.
++			 *
++			 * Bank PL has no supply here: its consumer is r_i2c0 (PL0/PL1),
++			 * the bus the PMIC itself sits on, and it requests its pins before
++			 * the PMIC exists. A vcc-pl-supply from ALDO1 would defer the I2C
++			 * controller that has to probe first for ALDO1 to exist. Bank PM,
++			 * on r_pio, runs from the same rail and gets its supply there.
++			 */
++			vcc-pb-supply = <&reg_swout2>;
++			vcc-pc-supply = <&reg_cldo5>;
++			vcc-pd-supply = <&reg_swout1>;
++			vcc-pe-supply = <&reg_bldo1>;
++			vcc-pf-supply = <&reg_swout2>;
++			vcc-pg-supply = <&reg_aldo1>;
++			vcc-ph-supply = <&reg_swout2>;
++			vcc-pj-supply = <&reg_swout1>;
++			vcc-pk-supply = <&reg_bldo1>;
++
+ 			uart0_pb_pins: uart0-pb-pins {
+ 				pins = "PB9", "PB10";
+ 				allwinner,pinmux = <2>;
+@@ -2295,13 +2341,10 @@ gmac0_syscon: syscon@4508000 {
+ 		 * (root interrupt-parent). We use only PM5 as a GPIO output (VBUS
+ 		 * enable); the EINT domain is set up but unused.
+ 		 *
+-		 * Caveat: the a523-r driver sets io_bias_cfg_variant =
+-		 * BIAS_VOLTAGE_PIO_POW_MODE_SEL, the 1-bit write that does not fit
+-		 * the A733's 2-bit POW_MOD_SEL. It stays dormant here because
+-		 * no bank has a vcc-pX-supply: the dummy regulator has no ops and no
+-		 * fixed_uV, so regulator_get_voltage() returns -EINVAL and set_io_bias
+-		 * leaves at its uV < 0 branch. A PL/PM supply needs an A733 r-pinctrl
+-		 * carrying the correct 2-bit variant -- that is `pinctrl-sunxi-add-a733-r-pinctrl`.
++		 * The A733 has its own r-pinctrl driver with the two-bit
++		 * SGPIO_POW_MOD_SEL (PL at 1:0, PM at 3:2). Bank PM carries a
++		 * supply (vcc-pm-supply on r_pio), bank PL none, see the pin bank
++		 * supplies on pio.
+ 		 */
+ 		r_ccu: clock-controller@7010000 {
+ 			compatible = "allwinner,sun60i-a733-r-ccu";
+@@ -2377,6 +2420,15 @@ r_pio: pinctrl@7025000 {
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+ 
++			/*
++			 * Bank PM: the VCC-PM ball reaches VCC-PL, ALDO1, 3.3 V, through
++			 * RA13 (0R); the net named VCC-PM on CLDO1 does not reach the
++			 * SoC. SGPIO_POW_MOD_SEL 3:2 gets 10 (3.3 V mode) from it, the
++			 * reset value. No vcc-pl-supply: see the pin bank supplies on
++			 * pio.
++			 */
++			vcc-pm-supply = <&reg_aldo1>;
++
+ 			/*
+ 			 * PMU I2C = S_TWI0 on PL0/PL1 (mux 2). Pin/mux from the
+ 			 * pin tables (PL0 = S-TWI0-SCK, PL1 = S-TWI0-SDA)
+@@ -2574,6 +2626,27 @@ reg_dcdc5: dcdc5 {
+ 						regulator-always-on;
+ 					};
+ 
++					/*
++					 * VCC-PL: bank PL (the PMIC bus pins), banks PG and PM, the
++					 * EEPROM and the TWI0 pull-ups. Always on: the PMIC bus runs
++					 * on bank PL. 3.3 V as read back from the PMIC, no window.
++					 * Not "vcc-pl": a bank finds a rail by that name, PL has none.
++					 */
++					reg_aldo1: aldo1 {
++						regulator-name = "vcc-pl-pg-pm";
++						regulator-always-on;
++					};
++
++					/*
++					 * 1.8 V I/O: banks PE and PK, VCC-MCSI and the camera
++					 * signals on J5. Always on: VCC-MCSI names no supply, so the
++					 * regulator core would switch the rail off after boot.
++					 */
++					reg_bldo1: bldo1 {
++						regulator-name = "vcc-pe-pk-mcsi";
++						regulator-always-on;
++					};
++
+ 					/*
+ 					 * SWOUT1 = reg 0x11 BIT(3) = Maxio PHY
+ 					 * 3v3 (board net VCC33-LCD). SWOUT2 =

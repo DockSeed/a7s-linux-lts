@@ -53,12 +53,17 @@ Two smaller changes come with it, both from reading the regulator core:
 No functional change until a bank carries a supply: without one, the dummy
 regulator's -EINVAL still stops the path before the register.
 
+Bank PF has a field in the table but is marked NO_FIELD: the kernel switches
+its supply between 3.3 V and 1.8 V for SD UHS and sets its withstand mode
+together with that switch, so a write from the supply named in the DT would
+set the mode of the supply selected after reset. The mode follows the switch
+in `pinctrl-sunxi-a733-set-the-withstand-mode-of-bank-pf-with-its-supply`.
+
 Assisted-by: Claude
 ---
-diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
---- a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c	2026-08-15 09:58:53.498733885 +0200
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c	2026-08-15 09:59:52.054817041 +0200
-@@ -43,6 +43,42 @@
+--- a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
+@@ -43,6 +43,47 @@ static const u8 a733_irq_bank_muxes[SUNXI_PINCTRL_MAX_BANKS] =
  /*	  PA  PB  PC  PD  PE  PF  PG  PH  PI  PJ  PK */
  	{  0, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14 };
  
@@ -70,7 +75,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pin
 + *	19:18 PJ	17:16 -		15:14 PH	13:12 PG
 + *	11:10 PF	 9:8  PE	 7:6  PD	 5:4  PC	3:0 -
 + *
-+ * Three banks deliberately carry NO_FIELD:
++ * Four banks deliberately carry NO_FIELD:
 + *
 + *  - PA and PI have no bonded pins, so no pin of theirs can ever be requested
 + *    and no field of theirs can ever be reached. (PI's 17:16 slot is real and
@@ -83,6 +88,11 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pin
 + *    pads besides PB's that field covers is stated nowhere we can read, so a
 + *    PB pin request does not write it. Closing this needs a document, not a
 + *    guess.
++ *  - PF has a field, but its supply is switched between 3.3 V and 1.8 V
++ *    by the kernel (GPIO_POW_VAL_SET_CTL, see sunxi_pconf_set_power_source()),
++ *    and its withstand mode follows that switch. A write from the supply
++ *    named in the DT would set the mode of the supply selected after reset
++ *    while the bank may already run at the other voltage.
 + */
 +static const u8 a733_io_bias_field_shift[SUNXI_PINCTRL_MAX_BANKS] = {
 +	[0]  = POW_MOD_SEL_2BIT_NO_FIELD,	/* PA - unbonded */
@@ -90,7 +100,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pin
 +	[2]  = 4,				/* PC */
 +	[3]  = 6,				/* PD */
 +	[4]  = 8,				/* PE */
-+	[5]  = 10,				/* PF */
++	[5]  = POW_MOD_SEL_2BIT_NO_FIELD,	/* PF - follows its supply switch */
 +	[6]  = 12,				/* PG */
 +	[7]  = 14,				/* PH */
 +	[8]  = POW_MOD_SEL_2BIT_NO_FIELD,	/* PI - unbonded */
@@ -101,7 +111,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pin
  static struct sunxi_pinctrl_desc a733_pinctrl_data = {
  	/*
  	 * Bank PF I/O voltage is selected in the SoC via GPIO_POW_VAL_SET_CTL,
-@@ -50,6 +86,14 @@
+@@ -50,6 +91,14 @@ static struct sunxi_pinctrl_desc a733_pinctrl_data = {
  	 * 1.8 V signalling switch from the mmc_1v8 pinctrl state.
  	 */
  	.pf_power_switch = true,
@@ -116,10 +126,9 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pin
  	.irq_banks = ARRAY_SIZE(a733_irq_bank_map),
  	.irq_bank_map = a733_irq_bank_map,
  	.irq_read_needs_mux = true,
-diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c	2026-08-15 09:58:53.486733868 +0200
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c	2026-08-15 10:02:45.855063853 +0200
-@@ -826,11 +826,19 @@
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -826,11 +826,19 @@ static int sunxi_pinctrl_set_io_bias_cfg(struct sunxi_pinctrl *pctl,
  	if (!pctl->desc->io_bias_cfg_variant)
  		return 0;
  
@@ -140,7 +149,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctr
  	if (uV == 0)
  		return 0;
  
-@@ -885,6 +893,44 @@
+@@ -885,6 +893,44 @@ static int sunxi_pinctrl_set_io_bias_cfg(struct sunxi_pinctrl *pctl,
  		       pctl->membase + pctl->pow_mod_sel_offset);
  		raw_spin_unlock_irqrestore(&pctl->lock, flags);
  		return 0;
@@ -185,7 +194,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctr
  	default:
  		return -EINVAL;
  	}
-@@ -1029,7 +1075,15 @@
+@@ -1029,7 +1075,15 @@ static int sunxi_pmx_request(struct pinctrl_dev *pctldev, unsigned offset)
  		goto out;
  	}
  
@@ -202,9 +211,8 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctr
  
  	s_reg->regulator = reg;
  	refcount_set(&s_reg->refcount, 1);
-diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h	2026-08-15 09:58:53.474733851 +0200
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h	2026-08-15 09:59:10.870758555 +0200
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
 @@ -77,6 +77,31 @@
   */
  #define A733_POW_VAL_SET_CTL_REG	0x70
@@ -237,7 +245,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctr
  #define PINS_PER_BANK		32
  
  #define IRQ_PER_BANK		32
-@@ -144,6 +169,13 @@
+@@ -144,6 +169,13 @@ enum sunxi_desc_bias_voltage {
  	 */
  	BIAS_VOLTAGE_PIO_POW_MODE_CTL,
  	BIAS_VOLTAGE_PIO_POW_MODE_CTL_INV,
@@ -251,7 +259,7 @@ diff -uNr a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctr
  };
  
  struct sunxi_desc_function {
-@@ -175,6 +207,12 @@
+@@ -175,6 +207,12 @@ struct sunxi_pinctrl_desc {
  	 */
  	bool				pf_power_switch;
  	enum sunxi_desc_bias_voltage	io_bias_cfg_variant;

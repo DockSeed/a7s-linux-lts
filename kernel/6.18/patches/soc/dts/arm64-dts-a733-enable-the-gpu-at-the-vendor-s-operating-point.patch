@@ -84,7 +84,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2690,39 +2690,28 @@ cpupll_ccu: clock-controller@8870000 {
+@@ -2646,39 +2646,28 @@ cpupll_ccu: clock-controller@8870000 {
  		 * (pvr_drv.c dt_match[]); no SoC-specific string is needed and
  		 * none is invented here.
  		 *
@@ -144,7 +144,7 @@ Assisted-by: Claude
  		 *
  		 * Where the values come from:
  		 *
-@@ -2758,7 +2747,42 @@ gpu: gpu@1800000 {
+@@ -2714,7 +2703,42 @@ gpu: gpu@1800000 {
  			power-domains = <&pck600 PD_GPU_TOP>,
  					<&pck600 PD_GPU_CORE>;
  			power-domain-names = "a", "b";

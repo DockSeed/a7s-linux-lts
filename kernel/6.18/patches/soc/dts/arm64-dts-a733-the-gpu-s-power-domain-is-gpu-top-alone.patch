@@ -74,7 +74,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2744,9 +2744,16 @@ gpu: gpu@1800000 {
+@@ -2700,9 +2700,16 @@ gpu: gpu@1800000 {
  				 <&ccu CLK_BUS_GPU0>;
  			clock-names = "core", "mem", "sys";
  			resets = <&ccu RST_BUS_GPU0>;

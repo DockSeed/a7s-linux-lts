@@ -67,7 +67,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1286,10 +1286,23 @@ ohci1: usb@4200400 {
+@@ -1242,10 +1242,23 @@ ohci1: usb@4200400 {
  		 * reachable -- with the gate alone the whole window reads zero,
  		 * measured, so the reset is not a formality here.
  		 *
@@ -95,7 +95,7 @@ Assisted-by: Claude
  		 *
  		 * No supplies. The vendor's `vdd-edp`/`vcc-edp` are panel rails and
  		 * this board has no panel; the rail that does feed this path is
-@@ -1303,8 +1316,8 @@ edp0: displayport@5740000 {
+@@ -1259,8 +1272,8 @@ edp0: displayport@5740000 {
  			clocks = <&ccu CLK_BUS_EDP>;
  			clock-names = "bus";
  			resets = <&ccu RST_BUS_EDP>;

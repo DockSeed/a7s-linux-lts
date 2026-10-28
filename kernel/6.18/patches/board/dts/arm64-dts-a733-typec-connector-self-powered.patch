@@ -62,7 +62,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2517,6 +2517,27 @@ usb_con: connector {
+@@ -2473,6 +2473,27 @@ usb_con: connector {
  					power-role = "source";
  					data-role = "host";
  					typec-power-opmode = "default";

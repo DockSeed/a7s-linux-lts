@@ -79,7 +79,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3366,20 +3366,29 @@ / {
+@@ -3362,20 +3362,29 @@ / {
  	 *   opp-microvolt-speed4  bin 0x04, PMIC readback on the 6 GiB board
  	 *   opp-microvolt-speed5  bin 0x05, PMIC readback on the 8 GiB board
  	 *   opp-microvolt         worst case = per-frequency maximum over
@@ -118,7 +118,7 @@ Assisted-by: Claude
  	 *
  	 * DCDC5 is one rail feeding VDD-CPUL and VDD-DSU together, so
  	 * these are also the DSU's voltages: the DSU driver caps the DSU
-@@ -3399,12 +3408,13 @@ cluster0_opp: opp-table-cluster0 {
+@@ -3395,12 +3404,13 @@ cluster0_opp: opp-table-cluster0 {
  		 */
  
  		/*
@@ -138,7 +138,7 @@ Assisted-by: Claude
  		 * need a voltage no bin documents.
  		 *
  		 * 494 MHz = 26 MHz x N=19 with EXT_DIVP /1; its VCO is 494 MHz,
-@@ -3423,7 +3433,7 @@ cluster0_opp: opp-table-cluster0 {
+@@ -3419,7 +3429,7 @@ cluster0_opp: opp-table-cluster0 {
  		opp-247000000 {
  			opp-hz = /bits/ 64 <247000000>;
  			clock-latency-ns = <45000>;
@@ -147,7 +147,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3432,7 +3442,7 @@ opp-247000000 {
+@@ -3428,7 +3438,7 @@ opp-247000000 {
  		opp-494000000 {
  			opp-hz = /bits/ 64 <494000000>;
  			clock-latency-ns = <45000>;
@@ -156,7 +156,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3441,7 +3451,7 @@ opp-494000000 {
+@@ -3437,7 +3447,7 @@ opp-494000000 {
  		opp-416000000 {
  			opp-hz = /bits/ 64 <416000000>;
  			clock-latency-ns = <45000>;
@@ -165,7 +165,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3450,7 +3460,7 @@ opp-416000000 {
+@@ -3446,7 +3456,7 @@ opp-416000000 {
  		opp-780000000 {
  			opp-hz = /bits/ 64 <780000000>;
  			clock-latency-ns = <45000>;
@@ -174,7 +174,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3459,7 +3469,7 @@ opp-780000000 {
+@@ -3455,7 +3465,7 @@ opp-780000000 {
  		opp-1014000000 {
  			opp-hz = /bits/ 64 <1014000000>;
  			clock-latency-ns = <45000>;
@@ -183,7 +183,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3468,7 +3478,7 @@ opp-1014000000 {
+@@ -3464,7 +3474,7 @@ opp-1014000000 {
  		opp-1196000000 {
  			opp-hz = /bits/ 64 <1196000000>;
  			clock-latency-ns = <45000>;
@@ -192,7 +192,7 @@ Assisted-by: Claude
  			opp-microvolt = <850000 850000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3477,7 +3487,7 @@ opp-1196000000 {
+@@ -3473,7 +3483,7 @@ opp-1196000000 {
  		opp-1404000000 {
  			opp-hz = /bits/ 64 <1404000000>;
  			clock-latency-ns = <45000>;
@@ -201,7 +201,7 @@ Assisted-by: Claude
  			opp-microvolt = <950000 950000 1050000>;
  			opp-microvolt-speed4 = <840000 840000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3486,7 +3496,7 @@ opp-1404000000 {
+@@ -3482,7 +3492,7 @@ opp-1404000000 {
  		opp-1508000000 {
  			opp-hz = /bits/ 64 <1508000000>;
  			clock-latency-ns = <45000>;
@@ -210,7 +210,7 @@ Assisted-by: Claude
  			opp-microvolt = <1000000 1000000 1050000>;
  			opp-microvolt-speed4 = <880000 880000 1050000>;
  			opp-microvolt-speed5 = <820000 820000 1050000>;
-@@ -3495,7 +3505,7 @@ opp-1508000000 {
+@@ -3491,7 +3501,7 @@ opp-1508000000 {
  		opp-1612000000 {
  			opp-hz = /bits/ 64 <1612000000>;
  			clock-latency-ns = <45000>;
@@ -219,7 +219,7 @@ Assisted-by: Claude
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <920000 920000 1050000>;
  			opp-microvolt-speed5 = <860000 860000 1050000>;
-@@ -3504,7 +3514,7 @@ opp-1612000000 {
+@@ -3500,7 +3510,7 @@ opp-1612000000 {
  		opp-1716000000 {
  			opp-hz = /bits/ 64 <1716000000>;
  			clock-latency-ns = <45000>;
@@ -228,7 +228,7 @@ Assisted-by: Claude
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <960000 960000 1050000>;
  			opp-microvolt-speed5 = <900000 900000 1050000>;
-@@ -3513,7 +3523,7 @@ opp-1716000000 {
+@@ -3509,7 +3519,7 @@ opp-1716000000 {
  		opp-1794000000 {
  			opp-hz = /bits/ 64 <1794000000>;
  			clock-latency-ns = <45000>;
@@ -237,7 +237,7 @@ Assisted-by: Claude
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
  			opp-microvolt-speed5 = <950000 950000 1050000>;
-@@ -3537,20 +3547,29 @@ opp-1794000000 {
+@@ -3533,20 +3543,29 @@ opp-1794000000 {
  	 *   opp-microvolt-speed4  bin 0x04, PMIC readback on the 6 GiB board
  	 *   opp-microvolt-speed5  bin 0x05, PMIC readback on the 8 GiB board
  	 *   opp-microvolt         worst case = per-frequency maximum over
@@ -276,7 +276,7 @@ Assisted-by: Claude
  	 */
  	cluster1_opp: opp-table-cluster1 {
  		compatible = "allwinner,sun60i-a733-operating-points";
-@@ -3558,12 +3577,13 @@ cluster1_opp: opp-table-cluster1 {
+@@ -3554,12 +3573,13 @@ cluster1_opp: opp-table-cluster1 {
  		opp-shared;
  
  		/*
@@ -296,7 +296,7 @@ Assisted-by: Claude
  		 * need a voltage no bin documents.
  		 *
  		 * 494 MHz = 26 MHz x N=19 with EXT_DIVP /1; its VCO is 494 MHz,
-@@ -3582,7 +3602,7 @@ cluster1_opp: opp-table-cluster1 {
+@@ -3578,7 +3598,7 @@ cluster1_opp: opp-table-cluster1 {
  		opp-247000000 {
  			opp-hz = /bits/ 64 <247000000>;
  			clock-latency-ns = <38000>;
@@ -305,7 +305,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3591,7 +3611,7 @@ opp-247000000 {
+@@ -3587,7 +3607,7 @@ opp-247000000 {
  		opp-494000000 {
  			opp-hz = /bits/ 64 <494000000>;
  			clock-latency-ns = <38000>;
@@ -314,7 +314,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3600,7 +3620,7 @@ opp-494000000 {
+@@ -3596,7 +3616,7 @@ opp-494000000 {
  		opp-416000000 {
  			opp-hz = /bits/ 64 <416000000>;
  			clock-latency-ns = <38000>;
@@ -323,7 +323,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3609,7 +3629,7 @@ opp-416000000 {
+@@ -3605,7 +3625,7 @@ opp-416000000 {
  		opp-780000000 {
  			opp-hz = /bits/ 64 <780000000>;
  			clock-latency-ns = <38000>;
@@ -332,7 +332,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3618,7 +3638,7 @@ opp-780000000 {
+@@ -3614,7 +3634,7 @@ opp-780000000 {
  		opp-1014000000 {
  			opp-hz = /bits/ 64 <1014000000>;
  			clock-latency-ns = <38000>;
@@ -341,7 +341,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3627,7 +3647,7 @@ opp-1014000000 {
+@@ -3623,7 +3643,7 @@ opp-1014000000 {
  		opp-1196000000 {
  			opp-hz = /bits/ 64 <1196000000>;
  			clock-latency-ns = <38000>;
@@ -350,7 +350,7 @@ Assisted-by: Claude
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3636,7 +3656,7 @@ opp-1196000000 {
+@@ -3632,7 +3652,7 @@ opp-1196000000 {
  		opp-1404000000 {
  			opp-hz = /bits/ 64 <1404000000>;
  			clock-latency-ns = <38000>;
@@ -359,7 +359,7 @@ Assisted-by: Claude
  			opp-microvolt = <850000 850000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3645,7 +3665,7 @@ opp-1404000000 {
+@@ -3641,7 +3661,7 @@ opp-1404000000 {
  		opp-1508000000 {
  			opp-hz = /bits/ 64 <1508000000>;
  			clock-latency-ns = <38000>;
@@ -368,7 +368,7 @@ Assisted-by: Claude
  			opp-microvolt = <900000 900000 1050000>;
  			opp-microvolt-speed4 = <820000 820000 1050000>;
  			opp-microvolt-speed5 = <800000 800000 1050000>;
-@@ -3654,7 +3674,7 @@ opp-1508000000 {
+@@ -3650,7 +3670,7 @@ opp-1508000000 {
  		opp-1612000000 {
  			opp-hz = /bits/ 64 <1612000000>;
  			clock-latency-ns = <38000>;
@@ -377,7 +377,7 @@ Assisted-by: Claude
  			opp-microvolt = <950000 950000 1050000>;
  			opp-microvolt-speed4 = <840000 840000 1050000>;
  			opp-microvolt-speed5 = <820000 820000 1050000>;
-@@ -3663,7 +3683,7 @@ opp-1612000000 {
+@@ -3659,7 +3679,7 @@ opp-1612000000 {
  		opp-1716000000 {
  			opp-hz = /bits/ 64 <1716000000>;
  			clock-latency-ns = <38000>;
@@ -386,7 +386,7 @@ Assisted-by: Claude
  			opp-microvolt = <1000000 1000000 1050000>;
  			opp-microvolt-speed4 = <870000 870000 1050000>;
  			opp-microvolt-speed5 = <850000 850000 1050000>;
-@@ -3672,7 +3692,7 @@ opp-1716000000 {
+@@ -3668,7 +3688,7 @@ opp-1716000000 {
  		opp-1794000000 {
  			opp-hz = /bits/ 64 <1794000000>;
  			clock-latency-ns = <38000>;
@@ -395,7 +395,7 @@ Assisted-by: Claude
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <920000 920000 1050000>;
  			opp-microvolt-speed5 = <900000 900000 1050000>;
-@@ -3681,7 +3701,7 @@ opp-1794000000 {
+@@ -3677,7 +3697,7 @@ opp-1794000000 {
  		opp-1898000000 {
  			opp-hz = /bits/ 64 <1898000000>;
  			clock-latency-ns = <38000>;
@@ -404,7 +404,7 @@ Assisted-by: Claude
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <970000 970000 1050000>;
  			opp-microvolt-speed5 = <940000 940000 1050000>;
-@@ -3690,7 +3710,7 @@ opp-1898000000 {
+@@ -3686,7 +3706,7 @@ opp-1898000000 {
  		opp-1950000000 {
  			opp-hz = /bits/ 64 <1950000000>;
  			clock-latency-ns = <38000>;
@@ -413,7 +413,7 @@ Assisted-by: Claude
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
  			opp-microvolt-speed5 = <970000 970000 1050000>;
-@@ -3699,7 +3719,7 @@ opp-1950000000 {
+@@ -3695,7 +3715,7 @@ opp-1950000000 {
  		opp-2002000000 {
  			opp-hz = /bits/ 64 <2002000000>;
  			clock-latency-ns = <38000>;
