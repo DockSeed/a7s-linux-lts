@@ -18,6 +18,10 @@
 #                   the AIC8800 modules -> OUT_DIR, with KERNEL-ID
 #   all             fetch + apply-patches + build
 #   key             print the identity of this checkout's kernel (cache key)
+#   deb             after build: the kernel as Debian packages (linux-image,
+#                   linux-headers) in OUT_DIR/deb; needs A7S_KERNEL_REVISION
+#   package         after build and deb: the release files in OUT_DIR/release
+#                   (loose files, modules, the two packages, SHA256SUMS)
 #
 # Needs an aarch64 cross compiler (none on an aarch64 host), make, patch, bc,
 # bison, flex, libssl, libelf, kmod, xz, git and curl (container/packages.txt
@@ -31,6 +35,8 @@
 #                                  time of this checkout's HEAD. An ambient
 #                                  SOURCE_DATE_EPOCH is ignored on purpose: the
 #                                  kernel must not change with the caller.
+#   A7S_KERNEL_REVISION            r<n> or t<n>: the release being built (from its
+#                                  tag); part of the kernel release and of the key
 #   A7S_KERNEL_DTB, A7S_KERNEL_SERIES, A7S_KERNEL_PATCHES, A7S_KERNEL_CONFIG,
 #   A7S_SKIP_PATCHES, A7S_LOCALVERSION   developer switches, see scripts/lib/kernel.sh
 #   A7S_DOWNLOAD_MIRROR, A7S_FETCH_MAX_TIME   see scripts/lib/common.sh
@@ -46,6 +52,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${ROOT_DIR}/scripts/lib/kernel.sh"
 # shellcheck source=lib/aic8800.sh
 . "${ROOT_DIR}/scripts/lib/aic8800.sh"
+# shellcheck source=lib/deb.sh
+. "${ROOT_DIR}/scripts/lib/deb.sh"
+# shellcheck source=lib/release.sh
+. "${ROOT_DIR}/scripts/lib/release.sh"
 
 # Fixed paths, locale and build time, so that equal inputs give equal bytes.
 env_setup() {
@@ -90,6 +100,8 @@ main() {
     compile-check) env_setup; stage_compile_check ;;
     build)         env_setup; stage_build ;;
     all)           env_setup; stage_all ;;
+    deb)           env_setup; stage_deb ;;
+    package)       env_setup; stage_package ;;
     -h|--help|help) usage 1 0 ;;
     *)             usage ;;
   esac

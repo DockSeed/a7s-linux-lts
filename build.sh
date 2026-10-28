@@ -8,7 +8,7 @@
 # The steps themselves are scripts/build.sh, which runs inside the container.
 #
 #   ./build.sh [<step>]           pins | fetch | apply-patches | compile-check |
-#                                 build | all (default) | key
+#                                 build | deb | package | all (default) | key
 #   ./build.sh shell [<cmd>...]   a shell (or one command) in the builder
 #   ./build.sh --help
 #
@@ -30,7 +30,7 @@ Usage:
                                    interactive shell (or one command) in the builder
   ./build.sh --help                this text
 
-Steps (scripts/build.sh): pins, fetch, apply-patches, compile-check, build,
+Steps (scripts/build.sh): pins, fetch, apply-patches, compile-check, build, deb, package,
 all, key.
 
 Environment (read by this script only):
@@ -38,7 +38,7 @@ Environment (read by this script only):
   KERNEL_WORK     where the sources are unpacked and built (default: ./work)
   KERNEL_OUT      where the result goes (default: ./out)
   KERNEL_CACHE    verified downloads, shared between checkouts (default: ./cache)
-Passed into the container when set: A7S_KERNEL_SOURCE_DATE_EPOCH, A7S_JOBS,
+Passed into the container when set: A7S_KERNEL_SOURCE_DATE_EPOCH, A7S_KERNEL_REVISION, A7S_JOBS,
 A7S_DOWNLOAD_MIRROR, A7S_FETCH_MAX_TIME and the developer switches
 A7S_KERNEL_DTB, A7S_KERNEL_SERIES, A7S_KERNEL_PATCHES, A7S_KERNEL_CONFIG,
 A7S_SKIP_PATCHES, A7S_LOCALVERSION.
@@ -136,7 +136,7 @@ main() {
   if [ -t 0 ] && [ -t 1 ]; then run+=(-it); elif [ "$1" = shell ]; then run+=(-i); fi
   local name
   for name in A7S_KERNEL_SOURCE_DATE_EPOCH A7S_JOBS A7S_DOWNLOAD_MIRROR A7S_FETCH_MAX_TIME \
-              A7S_KERNEL_DTB A7S_KERNEL_SERIES A7S_KERNEL_PATCHES A7S_KERNEL_CONFIG \
+              A7S_KERNEL_REVISION A7S_KERNEL_DTB A7S_KERNEL_SERIES A7S_KERNEL_PATCHES A7S_KERNEL_CONFIG \
               A7S_SKIP_PATCHES A7S_LOCALVERSION; do
     [ -z "${!name+x}" ] || run+=(-e "${name}=${!name}")
   done

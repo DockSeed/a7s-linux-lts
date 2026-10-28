@@ -119,6 +119,34 @@ stage_apply_patches() {
   log "applied ${applied} of ${total} series entries, skipped ${skipped}"
 }
 
+# The revision of a release build: A7S_KERNEL_REVISION=r1 or t1 (from the tag
+# v6.18.59-R1 or -T1). It becomes the local version of the kernel (release
+# 6.18.59-r1), so that /lib/modules/<release> and the Debian package names of
+# two releases of one kernel version differ. Unlike A7S_LOCALVERSION it is not a
+# developer variant: it is part of the identity (key, KERNEL-ID).
+kernel_revision_check() {
+  [ -z "${A7S_KERNEL_REVISION:-}" ] && return 0
+  [ -z "${A7S_LOCALVERSION:-}" ] || die "A7S_KERNEL_REVISION and A7S_LOCALVERSION are exclusive"
+  printf '%s' "${A7S_KERNEL_REVISION}" | grep -Eqx '[tr][0-9]+' \
+    || die "A7S_KERNEL_REVISION '${A7S_KERNEL_REVISION}' must look like r1 or t1"
+}
+
+# The local version make gets: the revision, or the developer's A7S_LOCALVERSION.
+kernel_localversion() {
+  if [ -n "${A7S_KERNEL_REVISION:-}" ]; then printf -- '-%s' "${A7S_KERNEL_REVISION}"
+  else printf '%s' "${A7S_LOCALVERSION:-}"; fi
+}
+
+# The number in the kernel's version banner ("#2 SMP"): the release number of an
+# r<n> revision, 1 for t<n> (the Debian package revision, see scripts/lib/deb.sh,
+# is the same number, and bindeb-pkg hands it to the kernel build).
+kernel_build_number() {
+  case "${A7S_KERNEL_REVISION:-}" in
+    r[0-9]*) printf '%s' "${A7S_KERNEL_REVISION#r}" ;;
+    t[0-9]*) printf '1' ;;
+  esac
+}
+
 # make for the kernel tree: cross compile unless the host is arm64.
 _kmake() {
   local cc=""
@@ -132,6 +160,8 @@ _kmake() {
   local stamp="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@${SOURCE_DATE_EPOCH}" '+%a, %d %b %Y %H:%M:%S +0000')}"
   make ARCH="${KERNEL_ARCH}" CROSS_COMPILE="${cc}" \
     KCFLAGS="-ffile-prefix-map=$(pwd)=. ${KCFLAGS:-}" \
+    ${A7S_KERNEL_REVISION:+LOCALVERSION="$(kernel_localversion)"} \
+    ${A7S_KERNEL_REVISION:+KBUILD_BUILD_VERSION="$(kernel_build_number)"} \
     ${A7S_LOCALVERSION:+LOCALVERSION="${A7S_LOCALVERSION}"} \
     KBUILD_BUILD_TIMESTAMP="${stamp}" \
     KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-root}" \
@@ -158,6 +188,10 @@ _kernel_configure() {
   # build hours later on the board.
   while read -r c; do ./scripts/config --enable "${c}"; done < <(_kassert y)
   while read -r c; do ./scripts/config --module "${c}"; done < <(_kassert m)
+  kernel_revision_check
+  if [ -n "${A7S_KERNEL_REVISION:-}" ]; then
+    log "revision ${A7S_KERNEL_REVISION}: kernel release will be ${KERNEL_VERSION}$(kernel_localversion)"
+  fi
   if [ -n "${A7S_LOCALVERSION:-}" ]; then
     printf '%s' "${A7S_LOCALVERSION}" | grep -Eqx -- '-[a-z0-9][a-z0-9.]*' \
       || die "A7S_LOCALVERSION '${A7S_LOCALVERSION}' must look like -t1 (lower case, digits, dots)"
@@ -211,7 +245,7 @@ stage_build_kernel() {
   # The raw Image and the one boot dtb: `dtbs` would compile hundreds of
   # unrelated boards.
   _kmake -j"${A7S_JOBS}" Image "${KERNEL_DTB}"
-  local want_release="${KERNEL_VERSION}${A7S_LOCALVERSION:-}"
+  local want_release="${KERNEL_VERSION}$(kernel_localversion)"
   [ "$(cat "${tree}/include/config/kernel.release")" = "${want_release}" ] \
     || die "kernel.release is '$(cat "${tree}/include/config/kernel.release")', expected '${want_release}'"
   mkdir -p "${OUT_DIR}"
@@ -263,6 +297,7 @@ write_kernel_id() {
     echo "tarball_sha256=${KERNEL_SHA256}"
     echo "source_date_epoch=${SOURCE_DATE_EPOCH}"
     echo "dtb=${KERNEL_DTB##*/}"
+    [ -z "${A7S_KERNEL_REVISION:-}" ] || echo "revision=${A7S_KERNEL_REVISION}"
     echo "aic8800=${AIC8800_COMMIT}"
     echo "aic8800_tag=${AIC8800_TAG}"
     [ -z "${variant}" ] || echo "variant=${variant}"
@@ -303,7 +338,8 @@ kernel_inputs_id() {
   { ( cd "${ROOT_DIR}" \
         && find scripts kernel pins out-of-tree container/packages.txt -type f -print0 \
            | LC_ALL=C sort -z | xargs -0 sha256sum ) \
-    && printf 'source_date_epoch=%s\n' "${sde}"; } \
+    && printf 'source_date_epoch=%s\n' "${sde}" \
+    && { [ -z "${A7S_KERNEL_REVISION:-}" ] || printf 'revision=%s\n' "${A7S_KERNEL_REVISION}"; }; } \
     | sha256sum | cut -d' ' -f1
 }
 
