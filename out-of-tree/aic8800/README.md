@@ -42,8 +42,8 @@ loader reports `chip_id=7` and `chip_mcu_id=0` on the board.
 
 ## Firmware
 
-The firmware is vendor-supplied binary without a licence statement. This
-recipe does not fetch or ship it. The image recipe
+The firmware is a vendor-supplied binary. This recipe does not fetch or ship
+it. The image recipe
 [a7s-build](https://github.com/DockSeed/a7s-build) fetches it from the same
 upstream commit and verifies it against its own hashes.
 
@@ -144,11 +144,9 @@ described in the patch headers.
 
 ## Licence
 
-The vendor driver is GPL-2.0 by Radxa's `debian/copyright` stanza for `src/*`
-(relayed from AICSemi); both modules declare `MODULE_LICENSE("GPL")`. The
-upstream SDK ships no licence file of its own. Our patches are GPL-2.0-only,
-matching the code they modify. The firmware is not covered by
-any of this (see above).
+The WLAN/BT driver is built by the image recipe from its pinned source and is
+not part of the releases of this repository. Our patches are GPL-2.0-only,
+matching the code they modify.
 
 ## Bumping the pin
 
