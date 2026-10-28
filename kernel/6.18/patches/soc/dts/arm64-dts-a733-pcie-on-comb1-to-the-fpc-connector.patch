@@ -54,10 +54,9 @@ header does not claim it.
 
 Assisted-by: Claude
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -594,6 +594,27 @@
+@@ -568,6 +568,27 @@ reg_wifi_3v3: regulator-wifi-3v3 {
  	 * Deliberately NOT regulator-always-on: the HUSB311 owns this rail as its
  	 * vbus-supply, and TCPM only leaves SRC_ATTACH_WAIT with VBUS down.
  	 */
@@ -85,7 +84,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  	reg_usb3_vbus: regulator-usb3-vbus {
  		compatible = "regulator-fixed";
  		regulator-name = "usb3-vbus";
-@@ -1965,6 +1986,85 @@
+@@ -1969,6 +1990,85 @@ edp0_out_con: endpoint {
  		 * INTID 185 is PCIE0_MSI, so GIC_SPI numbers and INTIDs must
  		 * not be mixed.
  		 */

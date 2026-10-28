@@ -39,10 +39,9 @@ For a comparison run without it: A7S_SKIP_PATCHES=arm64-dts-a733-cpu-opp-clock-l
 Assisted-by: Claude
 ---
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3342,6 +3342,13 @@ cluster0_opp: opp-table-cluster0 {
+@@ -3358,6 +3358,13 @@ cluster0_opp: opp-table-cluster0 {
  		nvmem-cells = <&cpu_speed_grade>;
  		opp-shared;
  
@@ -56,7 +55,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  		/*
  		 * Two points below the vendor's floor. The vendor's lowest is
  		 * 416 MHz; these are ours, and they exist because the whole
-@@ -3366,6 +3373,7 @@ cluster0_opp: opp-table-cluster0 {
+@@ -3382,6 +3389,7 @@ cluster0_opp: opp-table-cluster0 {
  		 */
  		opp-247000000 {
  			opp-hz = /bits/ 64 <247000000>;
@@ -64,7 +63,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3374,6 +3382,7 @@ opp-247000000 {
+@@ -3390,6 +3398,7 @@ opp-247000000 {
  
  		opp-494000000 {
  			opp-hz = /bits/ 64 <494000000>;
@@ -72,7 +71,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3382,6 +3391,7 @@ opp-494000000 {
+@@ -3398,6 +3407,7 @@ opp-494000000 {
  
  		opp-416000000 {
  			opp-hz = /bits/ 64 <416000000>;
@@ -80,7 +79,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3390,6 +3400,7 @@ opp-416000000 {
+@@ -3406,6 +3416,7 @@ opp-416000000 {
  
  		opp-780000000 {
  			opp-hz = /bits/ 64 <780000000>;
@@ -88,7 +87,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3398,6 +3409,7 @@ opp-780000000 {
+@@ -3414,6 +3425,7 @@ opp-780000000 {
  
  		opp-1014000000 {
  			opp-hz = /bits/ 64 <1014000000>;
@@ -96,7 +95,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3406,6 +3418,7 @@ opp-1014000000 {
+@@ -3422,6 +3434,7 @@ opp-1014000000 {
  
  		opp-1196000000 {
  			opp-hz = /bits/ 64 <1196000000>;
@@ -104,7 +103,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <850000 850000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3414,6 +3427,7 @@ opp-1196000000 {
+@@ -3430,6 +3443,7 @@ opp-1196000000 {
  
  		opp-1404000000 {
  			opp-hz = /bits/ 64 <1404000000>;
@@ -112,7 +111,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <950000 950000 1050000>;
  			opp-microvolt-speed4 = <840000 840000 1050000>;
-@@ -3422,6 +3436,7 @@ opp-1404000000 {
+@@ -3438,6 +3452,7 @@ opp-1404000000 {
  
  		opp-1508000000 {
  			opp-hz = /bits/ 64 <1508000000>;
@@ -120,7 +119,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1000000 1000000 1050000>;
  			opp-microvolt-speed4 = <880000 880000 1050000>;
-@@ -3430,6 +3445,7 @@ opp-1508000000 {
+@@ -3446,6 +3461,7 @@ opp-1508000000 {
  
  		opp-1612000000 {
  			opp-hz = /bits/ 64 <1612000000>;
@@ -128,7 +127,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <920000 920000 1050000>;
-@@ -3438,6 +3454,7 @@ opp-1612000000 {
+@@ -3454,6 +3470,7 @@ opp-1612000000 {
  
  		opp-1716000000 {
  			opp-hz = /bits/ 64 <1716000000>;
@@ -136,7 +135,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <960000 960000 1050000>;
-@@ -3446,6 +3463,7 @@ opp-1716000000 {
+@@ -3462,6 +3479,7 @@ opp-1716000000 {
  
  		opp-1794000000 {
  			opp-hz = /bits/ 64 <1794000000>;
@@ -144,7 +143,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
-@@ -3514,6 +3532,7 @@ cluster1_opp: opp-table-cluster1 {
+@@ -3530,6 +3548,7 @@ cluster1_opp: opp-table-cluster1 {
  		 */
  		opp-247000000 {
  			opp-hz = /bits/ 64 <247000000>;
@@ -152,7 +151,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3522,6 +3541,7 @@ opp-247000000 {
+@@ -3538,6 +3557,7 @@ opp-247000000 {
  
  		opp-494000000 {
  			opp-hz = /bits/ 64 <494000000>;
@@ -160,7 +159,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3530,6 +3550,7 @@ opp-494000000 {
+@@ -3546,6 +3566,7 @@ opp-494000000 {
  
  		opp-416000000 {
  			opp-hz = /bits/ 64 <416000000>;
@@ -168,7 +167,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3538,6 +3559,7 @@ opp-416000000 {
+@@ -3554,6 +3575,7 @@ opp-416000000 {
  
  		opp-780000000 {
  			opp-hz = /bits/ 64 <780000000>;
@@ -176,7 +175,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3546,6 +3568,7 @@ opp-780000000 {
+@@ -3562,6 +3584,7 @@ opp-780000000 {
  
  		opp-1014000000 {
  			opp-hz = /bits/ 64 <1014000000>;
@@ -184,7 +183,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3554,6 +3577,7 @@ opp-1014000000 {
+@@ -3570,6 +3593,7 @@ opp-1014000000 {
  
  		opp-1196000000 {
  			opp-hz = /bits/ 64 <1196000000>;
@@ -192,7 +191,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <800000 800000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3562,6 +3586,7 @@ opp-1196000000 {
+@@ -3578,6 +3602,7 @@ opp-1196000000 {
  
  		opp-1404000000 {
  			opp-hz = /bits/ 64 <1404000000>;
@@ -200,7 +199,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <850000 850000 1050000>;
  			opp-microvolt-speed4 = <800000 800000 1050000>;
-@@ -3570,6 +3595,7 @@ opp-1404000000 {
+@@ -3586,6 +3611,7 @@ opp-1404000000 {
  
  		opp-1508000000 {
  			opp-hz = /bits/ 64 <1508000000>;
@@ -208,7 +207,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <900000 900000 1050000>;
  			opp-microvolt-speed4 = <820000 820000 1050000>;
-@@ -3578,6 +3604,7 @@ opp-1508000000 {
+@@ -3594,6 +3620,7 @@ opp-1508000000 {
  
  		opp-1612000000 {
  			opp-hz = /bits/ 64 <1612000000>;
@@ -216,7 +215,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <950000 950000 1050000>;
  			opp-microvolt-speed4 = <840000 840000 1050000>;
-@@ -3586,6 +3613,7 @@ opp-1612000000 {
+@@ -3602,6 +3629,7 @@ opp-1612000000 {
  
  		opp-1716000000 {
  			opp-hz = /bits/ 64 <1716000000>;
@@ -224,7 +223,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1000000 1000000 1050000>;
  			opp-microvolt-speed4 = <870000 870000 1050000>;
-@@ -3594,6 +3622,7 @@ opp-1716000000 {
+@@ -3610,6 +3638,7 @@ opp-1716000000 {
  
  		opp-1794000000 {
  			opp-hz = /bits/ 64 <1794000000>;
@@ -232,7 +231,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <920000 920000 1050000>;
-@@ -3602,6 +3631,7 @@ opp-1794000000 {
+@@ -3618,6 +3647,7 @@ opp-1794000000 {
  
  		opp-1898000000 {
  			opp-hz = /bits/ 64 <1898000000>;
@@ -240,7 +239,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <970000 970000 1050000>;
-@@ -3610,6 +3640,7 @@ opp-1898000000 {
+@@ -3626,6 +3656,7 @@ opp-1898000000 {
  
  		opp-1950000000 {
  			opp-hz = /bits/ 64 <1950000000>;
@@ -248,7 +247,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			opp-supported-hw = <0x31>;
  			opp-microvolt = <1050000 1050000 1050000>;
  			opp-microvolt-speed4 = <1000000 1000000 1050000>;
-@@ -3618,6 +3649,7 @@ opp-1950000000 {
+@@ -3634,6 +3665,7 @@ opp-1950000000 {
  
  		opp-2002000000 {
  			opp-hz = /bits/ 64 <2002000000>;

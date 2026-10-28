@@ -58,7 +58,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -625,6 +625,25 @@
+@@ -584,6 +584,25 @@ reserved-memory {
  		scp@48100000 {
  			reg = <0x0 0x48100000 0x0 0x00100000>;
  		};

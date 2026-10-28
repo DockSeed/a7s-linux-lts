@@ -100,7 +100,7 @@ Assisted-by: Claude
  #include <dt-bindings/gpio/gpio.h>
  #include <dt-bindings/thermal/thermal.h>
  #include <dt-bindings/reset/sun60i-a733-ccu.h>
-@@ -473,18 +474,17 @@
+@@ -473,18 +474,17 @@ sys24M: osc24M: sys24M-clk {
  		clock-output-names = "sys24M";
  	};
  
@@ -127,7 +127,7 @@ Assisted-by: Claude
  	};
  
  	/*
-@@ -728,7 +728,7 @@
+@@ -702,7 +702,7 @@ pio: pinctrl@2000000 {
  				     <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>,
  				     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
  				     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
@@ -136,7 +136,7 @@ Assisted-by: Claude
  			clock-names = "apb", "hosc", "losc";
  			gpio-controller;
  			#gpio-cells = <3>;
-@@ -970,7 +970,7 @@
+@@ -944,7 +944,7 @@ rgmii0_pins: rgmii0-pins {
  		ccu: clock-controller@2002000 {
  			compatible = "allwinner,sun60i-a733-ccu";
  			reg = <0x0 0x02002000 0x0 0x2000>;
@@ -145,7 +145,7 @@ Assisted-by: Claude
  				 <&dcxo26M>;
  			clock-names = "hosc", "losc", "iosc", "dcxo";
  			#clock-cells = <1>;
-@@ -1088,7 +1088,7 @@
+@@ -1062,7 +1062,7 @@ wdt: watchdog@2050000 {
  				     "allwinner,sun55i-a523-wdt";
  			reg = <0x0 0x02050000 0x0 0x20>;
  			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
@@ -154,7 +154,7 @@ Assisted-by: Claude
  			clock-names = "hosc", "losc";
  			status = "disabled";
  		};
-@@ -2568,7 +2568,7 @@
+@@ -2572,7 +2572,7 @@ gmac0_syscon: syscon@4508000 {
  		r_ccu: clock-controller@7010000 {
  			compatible = "allwinner,sun60i-a733-r-ccu";
  			reg = <0x0 0x07010000 0x0 0x250>;
@@ -163,7 +163,7 @@ Assisted-by: Claude
  				 <&ccu CLK_PLL_PERI0_200M>,
  				 <&ccu CLK_PLL_PERI0_300M>,
  				 <&dcxo26M>;
-@@ -2624,7 +2624,7 @@
+@@ -2628,7 +2628,7 @@ r_watchdog: watchdog@7021000 {
  				     "allwinner,sun55i-a523-wdt";
  			reg = <0x0 0x07021000 0x0 0x20>;
  			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
@@ -172,7 +172,7 @@ Assisted-by: Claude
  			clock-names = "hosc", "losc";
  		};
  
-@@ -2634,7 +2634,7 @@
+@@ -2638,7 +2638,7 @@ r_pio: pinctrl@7025000 {
  			reg = <0x0 0x07025000 0x0 0x800>;
  			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
  				     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>;
@@ -181,7 +181,7 @@ Assisted-by: Claude
  			clock-names = "apb", "hosc", "losc";
  			gpio-controller;
  			#gpio-cells = <3>;
-@@ -3074,15 +3074,26 @@
+@@ -3090,15 +3090,26 @@ usb_con_sbu: endpoint {
  		 * Linear 16-bit day counter plus hour/minute/second (9.1.7.5,
  		 * 9.1.7.6): the r329 fallback selects that layout in rtc-sun6i.
  		 * One interrupt, RTC_ALARM = INTID 228 = SPI 196 (UM 12, IRQ

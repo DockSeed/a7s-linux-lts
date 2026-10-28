@@ -59,8 +59,6 @@ Assisted-by: Claude
  drivers/clk/sunxi-ng/ccu-sun60i-a733-cpu.c    | 42 +++++++++++++++----
  3 files changed, 50 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/allwinner,sun60i-a733-cpu-ccu.yaml b/Documentation/devicetree/bindings/clock/allwinner,sun60i-a733-cpu-ccu.yaml
-index 14a17da44..069bbe686 100644
 --- a/Documentation/devicetree/bindings/clock/allwinner,sun60i-a733-cpu-ccu.yaml
 +++ b/Documentation/devicetree/bindings/clock/allwinner,sun60i-a733-cpu-ccu.yaml
 @@ -31,12 +31,19 @@ properties:
@@ -100,11 +98,9 @@ index 14a17da44..069bbe686 100644
          #clock-cells = <1>;
      };
  
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-index 1eb2e9510..bf5db2f99 100644
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3172,8 +3172,12 @@ rtc_ccu: clock-controller@709015c {
+@@ -3188,8 +3188,12 @@ rtc_ccu: clock-controller@709015c {
  		cpupll_ccu: clock-controller@8870000 {
  			compatible = "allwinner,sun60i-a733-cpu-ccu";
  			reg = <0x0 0x08870000 0x0 0x3038>;
@@ -119,8 +115,6 @@ index 1eb2e9510..bf5db2f99 100644
  			#clock-cells = <1>;
  		};
  
-diff --git a/drivers/clk/sunxi-ng/ccu-sun60i-a733-cpu.c b/drivers/clk/sunxi-ng/ccu-sun60i-a733-cpu.c
-index 675f60993..e9a6d3d63 100644
 --- a/drivers/clk/sunxi-ng/ccu-sun60i-a733-cpu.c
 +++ b/drivers/clk/sunxi-ng/ccu-sun60i-a733-cpu.c
 @@ -524,10 +524,12 @@ A733_CPU_PLL(pll_cpu_dsu_clk, "pll-cpu-dsu",

@@ -1,0 +1,45 @@
+From fa3bb5011f33cccd246072954e64d64483d0d774 Mon Sep 17 00:00:00 2001
+From: Chaoyi Chen <chaoyi.chen@rock-chips.com>
+Date: Tue, 13 Jan 2026 17:58:27 +0800
+Subject: usb: misc: onboard_dev: Add WCH CH334 USB2.0 Hub (1a86:8091)
+
+[ Upstream commit fa3bb5011f33cccd246072954e64d64483d0d774 ]
+
+The WCH CH334/CH335[0] are USB2.0 protocol compliant 4-port USB HUB
+controller chips, supporting USB2.0 high-speed and full-speed for
+upstream ports, and USB2.0 high-speed 480Mbps, full-speed 12Mbps and
+low-speed 1.5Mbps for downstream ports, supporting not only low-cost STT
+mode (single TT schedules 4 downstream ports in time share), but also
+supports high performance MTT mode (4 TTs each corresponding to 1 port,
+concurrent processing).
+
+[0]: https://www.wch-ic.com/downloads/CH334DS1_PDF.html
+
+Signed-off-by: Chaoyi Chen <chaoyi.chen@rock-chips.com>
+Link: https://patch.msgid.link/20260113095827.115-3-kernel@airkyi.com
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+--- a/drivers/usb/misc/onboard_usb_dev.h
++++ b/drivers/usb/misc/onboard_usb_dev.h
+@@ -115,6 +115,13 @@ static const struct onboard_dev_pdata vialab_vl817_data = {
+ 	.is_hub = true,
+ };
+ 
++static const struct onboard_dev_pdata wch_ch334_data = {
++	.reset_us = 14000,
++	.num_supplies = 2,
++	.supply_names = { "vdd33", "v5" },
++	.is_hub = true,
++};
++
+ static const struct onboard_dev_pdata xmos_xvf3500_data = {
+ 	.reset_us = 1,
+ 	.num_supplies = 2,
+@@ -146,6 +153,7 @@ static const struct of_device_id onboard_dev_match[] = {
+ 	{ .compatible = "usbbda,5411", .data = &realtek_rts5411_data, },
+ 	{ .compatible = "usbbda,414", .data = &realtek_rts5411_data, },
+ 	{ .compatible = "usbbda,5414", .data = &realtek_rts5411_data, },
++	{ .compatible = "usb1a86,8091", .data = &wch_ch334_data, },
+ 	{ .compatible = "usb1da0,5511", .data = &parade_ps5511_data, },
+ 	{ .compatible = "usb1da0,55a1", .data = &parade_ps5511_data, },
+ 	{ .compatible = "usb2109,817", .data = &vialab_vl817_data, },

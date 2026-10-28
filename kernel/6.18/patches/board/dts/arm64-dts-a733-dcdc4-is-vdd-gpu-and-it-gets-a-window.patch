@@ -60,7 +60,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2438,6 +2438,70 @@
+@@ -2397,6 +2397,70 @@ reg_dcdc3: dcdc3 {
  						regulator-always-on;
  					};
  

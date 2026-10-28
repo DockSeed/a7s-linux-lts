@@ -140,7 +140,12 @@ soc/net/dt-bindings-net-sun8i-emac-add-a733-gmac200-per-channel-irqs.patch
 soc/net/net-stmmac-dwmac-sun55i-per-channel-irqs.patch
 soc/dts/arm64-dts-a733-gmac0-per-channel-tx-rx-irqs.patch
 soc/net/net-stmmac-retry-a-failed-rx-refill-from-a-timer.patch
-board/dts/arm64-dts-a733-power-the-onboard-wifi-module.patch
+backport/dt-bindings-usb-add-binding-for-wch-ch334-ch335-hub-controller.patch
+backport/usb-misc-onboard_dev-add-wch-ch334-usb2.0-hub-1a86-8091.patch
+soc/usb/dt-bindings-usb-wch-ch334-allow-hard-wired-devices-on-the-ports.patch
+soc/net/dt-bindings-net-wireless-add-aicsemi-aic8800d80-usb.patch
+soc/usb/usb-misc-onboard_usb_dev-add-the-aicsemi-aic8800d80.patch
+soc/bluetooth/bluetooth-btusb-request-the-reset-gpio-only-where-a-handler-uses-it.patch
 backport/mfd-axp20x-Constify-axp313-and-axp717-cells.patch
 backport/mfd-axp20x-i2c-Fix-i2c-instantiation.patch
 backport/dt-bindings-mfd-x-powers-axp152-Document-AXP318W.patch
@@ -210,6 +215,7 @@ soc/dts/arm64-dts-a733-display-engine-behind-iommu1.patch
 soc/display/drm-a733-kms-a-cursor-plane-on-vi1-and-blender-pipe-1.patch
 board/dts/arm64-dts-a733-uart1-on-pg6-pg7-pinctrl-proof.patch
 board/dts/arm64-dts-a733-bank-ph-io-supply.patch
+board/dts/arm64-dts-a733-describe-the-usb-hub-and-the-wifi-module.patch
 soc/dts/arm64-dts-a733-r-ccu-dcxo-input.patch
 board/dts/arm64-dts-a733-cubie-a7s-mmc-aliases.patch
 soc/clk/clk-sunxi-ng-a733-pcie-clocks-and-resets.patch

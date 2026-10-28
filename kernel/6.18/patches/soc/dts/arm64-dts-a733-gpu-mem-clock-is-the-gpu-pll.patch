@@ -50,10 +50,9 @@ difference is elsewhere and this patch is only a correctness fix for the
 Link: https://github.com/alexcaoys/allwinner-bsp/commit/b48ce2c542c57940febe0f7587d2cf79a1dcca12
 Assisted-by: Claude
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2781,7 +2781,7 @@
+@@ -2740,7 +2740,7 @@ gpu: gpu@1800000 {
  			compatible = "img,img-bxm-4-64", "img,img-rogue";
  			reg = <0x0 0x01800000 0x0 0x90000>;
  			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;

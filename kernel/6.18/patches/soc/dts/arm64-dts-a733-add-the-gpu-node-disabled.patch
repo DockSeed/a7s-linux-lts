@@ -74,10 +74,9 @@ Verification
 Assisted-by: Claude
 ---
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2723,6 +2723,84 @@ cpupll_ccu: clock-controller@8870000 {
+@@ -2682,6 +2682,84 @@ cpupll_ccu: clock-controller@8870000 {
  			clock-names = "dcxo";
  			#clock-cells = <1>;
  		};

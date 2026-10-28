@@ -84,7 +84,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2731,39 +2731,28 @@
+@@ -2690,39 +2690,28 @@ cpupll_ccu: clock-controller@8870000 {
  		 * (pvr_drv.c dt_match[]); no SoC-specific string is needed and
  		 * none is invented here.
  		 *
@@ -106,7 +106,20 @@ Assisted-by: Claude
 -		 *      domain map". Attaching a live block to the wrong
 -		 *      domain index power-manages a different block, so this
 -		 *      node stays inert until both are read on a board.
--		 *
++		 *   1. The firmware. The BVNC is no longer a borrowed number:
++		 *      the vendor DDK on this board's eMMC prints "Read BVNC
++		 *      36.56.104.183 from HW device registers", i.e. a
++		 *      ROGUE_CR_CORE_ID read on this silicon, closing the
++		 *      open BVNC question. The matching
++		 *      file is Imagination's own open-stack image, pinned and
++		 *      hashed by the fetch-gpu-firmware build stage and installed
++		 *      into the image with its licence text.
++		 *   2. The power domains. The indices are corroborated twice:
++		 *      the vendor device tree names pd_gpu_top_test -> 5 and
++		 *      pd_gpu_core_test -> 6, and the PCK-600 status registers
++		 *      read 5 = 0x8 and 6 = 0x8 while the vendor driver holds
++		 *      the GPU, against 4 (the NPU) = 0x0 with the NPU idle.
+ 		 *
 -		 * Checks, both cheap once a board is at hand:
 -		 * the domain status registers at 0x07060000 + N * 0x1000 + 0x8
 -		 * (so 0x07065008 for TOP and 0x07066008 for CORE) must track
@@ -123,20 +136,6 @@ Assisted-by: Claude
 -		 * platform core attaches it; with two it attaches them by the
 -		 * names "a" and "b", which is what this SoC's TOP/CORE split
 -		 * needs (pvr_power.c:607-660).
-+		 *   1. The firmware. The BVNC is no longer a borrowed number:
-+		 *      the vendor DDK on this board's eMMC prints "Read BVNC
-+		 *      36.56.104.183 from HW device registers", i.e. a
-+		 *      ROGUE_CR_CORE_ID read on this silicon, closing the
-+		 *      open BVNC question. The matching
-+		 *      file is Imagination's own open-stack image, pinned and
-+		 *      hashed by the fetch-gpu-firmware build stage and installed
-+		 *      into the image with its licence text.
-+		 *   2. The power domains. The indices are corroborated twice:
-+		 *      the vendor device tree names pd_gpu_top_test -> 5 and
-+		 *      pd_gpu_core_test -> 6, and the PCK-600 status registers
-+		 *      read 5 = 0x8 and 6 = 0x8 while the vendor driver holds
-+		 *      the GPU, against 4 (the NPU) = 0x0 with the NPU idle.
-+		 *
 +		 * What is deliberately not here yet is any rate control:
 +		 * no OPP table, no gpu-supply, no devfreq. This node brings the
 +		 * block up at one fixed, vendor-sanctioned operating point and
@@ -145,7 +144,7 @@ Assisted-by: Claude
  		 *
  		 * Where the values come from:
  		 *
-@@ -2799,7 +2788,42 @@
+@@ -2758,7 +2747,42 @@ gpu: gpu@1800000 {
  			power-domains = <&pck600 PD_GPU_TOP>,
  					<&pck600 PD_GPU_CORE>;
  			power-domain-names = "a", "b";

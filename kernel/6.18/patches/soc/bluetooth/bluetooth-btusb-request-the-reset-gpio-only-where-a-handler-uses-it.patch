@@ -1,0 +1,53 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] Bluetooth: btusb: Request the reset GPIO only where a handler uses it
+
+When onboard_usb_dev powers a WiFi/Bluetooth combo chip, the enable line
+of the chip is the reset-gpios property of its USB device node, and
+onboard_usb_dev holds that line. btusb asks for a "reset" GPIO on the same
+node for every device and ends the probe on any error, so it fails with
+-EBUSY and the Bluetooth function of the chip stays unbound. Seen on the
+Radxa Cubie A7S with an AIC8800D80: no hci0.
+
+Only the reset handlers of Intel, QCA and Realtek devices use this line
+(btusb_intel_reset(), btusb_qca_reset(), btusb_rtl_reset()). Request it for
+those devices only. For them nothing changes, a failure to get the line
+still ends the probe. All other devices, MediaTek included whose reset
+handler is btmtk_reset_sync(), never used the line after the request at
+probe. On a combo chip a btusb reset through it would also cut the WiFi
+function.
+
+A combo chip of one of these vendors behind onboard_usb_dev still
+collides; that needs the reset to go through onboard_usb_dev.
+
+Assisted-by: Claude
+---
+--- a/drivers/bluetooth/btusb.c
++++ b/drivers/bluetooth/btusb.c
+@@ -4162,13 +4162,20 @@ static int btusb_probe(struct usb_interface *intf,
+ 
+ 	SET_HCIDEV_DEV(hdev, &intf->dev);
+ 
+-	reset_gpio = gpiod_get_optional(&data->udev->dev, "reset",
+-					GPIOD_OUT_LOW);
+-	if (IS_ERR(reset_gpio)) {
+-		err = PTR_ERR(reset_gpio);
+-		goto out_free_dev;
+-	} else if (reset_gpio) {
+-		data->reset_gpio = reset_gpio;
++	/* Only the Intel, QCA and Realtek reset handlers use the reset line.
++	 * On other devices it may belong to another driver, such as
++	 * onboard_usb_dev powering a WiFi/Bluetooth combo chip.
++	 */
++	if (id->driver_info & (BTUSB_INTEL_COMBINED | BTUSB_QCA_ROME |
++			       BTUSB_QCA_WCN6855 | BTUSB_REALTEK)) {
++		reset_gpio = gpiod_get_optional(&data->udev->dev, "reset",
++						GPIOD_OUT_LOW);
++		if (IS_ERR(reset_gpio)) {
++			err = PTR_ERR(reset_gpio);
++			goto out_free_dev;
++		} else if (reset_gpio) {
++			data->reset_gpio = reset_gpio;
++		}
+ 	}
+ 
+ 	hdev->open    = btusb_open;

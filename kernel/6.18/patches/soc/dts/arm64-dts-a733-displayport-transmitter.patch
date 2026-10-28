@@ -68,10 +68,9 @@ reg, interrupt, clock, reset and phy. NOT verified: the board.
 
 Assisted-by: Claude
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1300,6 +1300,55 @@
+@@ -1259,6 +1259,55 @@ ohci1: usb@4200400 {
  		 * INTID 185 is PCIE0_MSI, so GIC_SPI numbers and INTIDs must
  		 * not be mixed.
  		 */

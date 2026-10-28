@@ -23,8 +23,6 @@ Assisted-by: Claude
  .../sun60i-a733-cubie-a7s-minimal.dts         | 67 +++++++++++++++++++
  1 file changed, 67 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-index 3b46119..412164a 100755
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 @@ -21,6 +21,7 @@
@@ -35,10 +33,7 @@ index 3b46119..412164a 100755
  #include <dt-bindings/reset/sun60i-a733-serdes-ccu.h>
  
  / {
-@@ -1558,12 +1559,13 @@
- 			clocks = <&osc24M>, <&osc32k>, <&iosc>,
- 				 <&ccu CLK_PLL_PERI0_200M>,
- 				 <&ccu CLK_PLL_PERI0_300M>;
+@@ -1520,6 +1521,7 @@ r_ccu: clock-controller@7010000 {
  			clock-names = "hosc", "losc", "iosc",
  				      "pll-periph-200m", "pll-periph-300m";
  			#clock-cells = <1>;
@@ -46,13 +41,7 @@ index 3b46119..412164a 100755
  		};
  
  		r_pio: pinctrl@7025000 {
- 			compatible = "allwinner,sun60i-a733-r-pinctrl",
- 				     "allwinner,sun55i-a523-r-pinctrl";
- 			reg = <0x0 0x07025000 0x0 0x800>;
-@@ -1572,12 +1574,77 @@
- 			clocks = <&r_ccu CLK_R_APB0>, <&osc24M>, <&osc32k>;
- 			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
+@@ -1534,6 +1536,71 @@ r_pio: pinctrl@7025000 {
  			#gpio-cells = <3>;
  			interrupt-controller;
  			#interrupt-cells = <3>;
@@ -124,6 +113,3 @@ index 3b46119..412164a 100755
  		};
  
  		/*
- 		 * RTC-CCU (PRCM @0x07090000, AON domain). Provides the two SERDES
- 		 * DCXO gates (XO_CTRL1 @0x16c bit4/5); the COMB0 combo-PHY consumes
- 		 * dcxo-serdes0. Parent = r-ahb (from the R-CCU). Driver = patch `clk-sunxi-ng-a733-add-minimal-rtc-ccu`.

@@ -134,10 +134,11 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1301,6 +1301,63 @@
+@@ -1259,6 +1259,63 @@ ohci1: usb@4200400 {
+ 		 * INTID 185 is PCIE0_MSI, so GIC_SPI numbers and INTIDs must
  		 * not be mixed.
  		 */
- 		/*
++		/*
 +		 * TCON_TV1 -- the timing controller that scans the mode and hands it
 +		 * to the DisplayPort transmitter. UM 15.2: TCON_TV1 is the TCON that drives
 +		 * eDP; base 0x05731000, 4 KiB, group
@@ -194,11 +195,10 @@ Assisted-by: Claude
 +			status = "okay";
 +		};
 +
-+		/*
+ 		/*
  		 * The DisplayPort transmitter -- a Trilinear DP 1.4 core, identified
  		 * by its own CORE_ID register reading 0x000A0509, the value UM
- 		 * 15.4.7 documents (measured on the 8 GiB board 2026-08-18 after ungating the
-@@ -1311,11 +1368,25 @@
+@@ -1270,11 +1327,25 @@ ohci1: usb@4200400 {
  		 * no output port graph. Those arrive with the KMS work and extend
  		 * this node rather than replacing it.
  		 *
@@ -229,7 +229,7 @@ Assisted-by: Claude
  		 *
  		 * interrupts: INTID 94 "EDP" = GIC_SPI 62 (interrupt list of the
  		 * A733 user manual). The AUX driver polls AUX_STATUS and does not
-@@ -1352,7 +1423,9 @@
+@@ -1311,7 +1382,9 @@ ohci1: usb@4200400 {
  		 */
  		edp0: displayport@5740000 {
  			compatible = "allwinner,sun60i-a733-dp";

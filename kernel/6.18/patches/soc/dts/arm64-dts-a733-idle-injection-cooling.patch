@@ -171,7 +171,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2543,6 +2543,120 @@
+@@ -2502,6 +2502,120 @@ &cpu6 {
  	#cooling-cells = <2>;
  };
  
@@ -292,7 +292,7 @@ Assisted-by: Claude
  / {
  	thermal-zones {
  		cpul_thermal: cpul-thermal {
-@@ -2562,6 +2676,11 @@
+@@ -2521,6 +2635,11 @@ cpul_critical: cpul-trip-1 {
  					type = "critical";
  					hysteresis = <0>;
  				};
@@ -304,7 +304,7 @@ Assisted-by: Claude
  			};
  
  			cooling-maps {
-@@ -2569,6 +2688,13 @@
+@@ -2528,6 +2647,13 @@ map0 {
  					trip = <&cpul_passive>;
  					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
  				};
@@ -318,7 +318,7 @@ Assisted-by: Claude
  			};
  		};
  
-@@ -2589,6 +2715,11 @@
+@@ -2548,6 +2674,11 @@ cpub_critical: cpub-trip-1 {
  					type = "critical";
  					hysteresis = <0>;
  				};
@@ -330,7 +330,7 @@ Assisted-by: Claude
  			};
  
  			cooling-maps {
-@@ -2596,6 +2727,11 @@
+@@ -2555,6 +2686,11 @@ map0 {
  					trip = <&cpub_passive>;
  					cooling-device = <&cpu6 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
  				};

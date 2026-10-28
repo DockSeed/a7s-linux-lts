@@ -368,14 +368,17 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1283,23 +1283,271 @@
+@@ -1242,23 +1242,271 @@ ohci1: usb@4200400 {
  		};
  
  		/*
 -		 * USB3.1 SuperSpeed: the USB3 DRD (Allwinner "USB2" block,
 -		 * UM USB3P1_DRD @0x06A00000, xHCI 1.20) + the COMB0 SERDES combo-PHY
 -		 * that carries the SuperSpeed lanes to Type-C J4.
--		 *
++		 * The display engine -- the block that reads a framebuffer out of
++		 * DRAM, composes it and hands pixels to TCON_TV1. DE0 @0x05000000,
++		 * 4 MiB, group DE_SYS.
+ 		 *
 -		 * dwc3 is described flat, through the generic glue: the glue owns the
 -		 * clocks and the reset and only then creates the core, so the
 -		 * controller is never reached before its bus clocks run. A bare
@@ -383,15 +386,6 @@ Assisted-by: Claude
 -		 * five clocks have no dwc3 clock name to go by -- and it leaves the
 -		 * bring-up depending on the combo-PHY probing first, which fw_devlink
 -		 * stopped honouring once the Type-C connector closed a graph ring.
--		 *
--		 * IRQ = GIC_SPI 155 (INTID 187, UM source "USB2" -- the controller
--		 * IRQ, not the COMB0 USB3 event, which is INTID 217 = GIC_SPI 185.
--		 * INTID 185 is PCIE0_MSI, so GIC_SPI numbers and INTIDs must
--		 * not be mixed.
-+		 * The display engine -- the block that reads a framebuffer out of
-+		 * DRAM, composes it and hands pixels to TCON_TV1. DE0 @0x05000000,
-+		 * 4 MiB, group DE_SYS.
-+		 *
 +		 * There is no DE1, which is worth stating because the rest of
 +		 * this display path comes in pairs (TCON_TV0/TV1, DPSS_TOP0/1,
 +		 * VIDEO_OUT0/1). DE0 is the only display engine among the UM's 143
@@ -399,7 +393,11 @@ Assisted-by: Claude
 +		 * seven blend channels, two outputs) are two ports of this ONE
 +		 * block: one aperture, one bus clock, one
 +		 * reset, one interrupt.
-+		 *
+ 		 *
+-		 * IRQ = GIC_SPI 155 (INTID 187, UM source "USB2" -- the controller
+-		 * IRQ, not the COMB0 USB3 event, which is INTID 217 = GIC_SPI 185.
+-		 * INTID 185 is PCIE0_MSI, so GIC_SPI numbers and INTIDs must
+-		 * not be mixed.
 +		 * Every offset inside this aperture is undocumented. A733 UM V0.92
 +		 * chapter 14.3 has a short description and no register list: no hits
 +		 * for GLB_CTL, BLD_, OVL_, blender or RCQ in the text.
@@ -656,7 +654,7 @@ Assisted-by: Claude
  		/*
  		 * TCON_TV1 -- the timing controller that scans the mode and hands it
  		 * to the DisplayPort transmitter. UM 15.2: TCON_TV1 is the TCON that drives
-@@ -1355,6 +1603,37 @@
+@@ -1314,6 +1562,37 @@ tcon_tv1: lcd-controller@5731000 {
  			assigned-clocks = <&ccu CLK_EDP_TV>;
  			assigned-clock-parents = <&ccu CLK_VIDEO1_PLL4X>;
  			status = "okay";
@@ -694,7 +692,7 @@ Assisted-by: Claude
  		};
  
  		/*
-@@ -1435,6 +1714,24 @@
+@@ -1394,6 +1673,24 @@ edp0: displayport@5740000 {
  			status = "okay";
  		};
  

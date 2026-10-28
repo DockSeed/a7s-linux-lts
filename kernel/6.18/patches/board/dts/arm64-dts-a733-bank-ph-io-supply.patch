@@ -101,7 +101,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -727,8 +727,27 @@
+@@ -686,8 +686,27 @@ pio: pinctrl@2000000 {
  			 * (V0.92 read it as Invalid). PE and PK read 00 as
  			 * well, every 3.3 V bank reads 10.
  			 *
@@ -131,7 +131,7 @@ Assisted-by: Claude
  			 *
  			 *  - PL is fatal. Its consumer is r_i2c0 (PL0/PL1), the
  			 *    bus the PMIC itself sits on, and it requests its
-@@ -740,21 +759,35 @@
+@@ -699,21 +718,35 @@ pio: pinctrl@2000000 {
  			 *  - PF has no single rail: its supply is selectable
  			 *    (VCC18-PF / VCC-IO) and the SoC-side switch is
  			 *    already owned by GPIO_POW_VAL_SET_CTL, patch `mmc-sunxi-pad-io-voltage-switch-without-vqmmc`.

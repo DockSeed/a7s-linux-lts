@@ -53,34 +53,34 @@ the gates have no consumer until the PCIe node lands.
 
 Assisted-by: Claude
 
-diff --git a/include/dt-bindings/clock/sun60i-a733-serdes-ccu.h b/include/dt-bindings/clock/sun60i-a733-serdes-ccu.h
---- a/include/dt-bindings/clock/sun60i-a733-serdes-ccu.h
-+++ b/include/dt-bindings/clock/sun60i-a733-serdes-ccu.h
-@@ -3,13 +3,21 @@
-  * A733 (sun60iw2) SERDES subsystem clock indices.
-  *
-  * SERDES_SUBSYS_APP at 0x06C00000 gates the bus clocks of the devices sitting
-- * behind the two combo-PHYs: USB3 at offset 0x0008, PCIe at 0x0004. Only the
-- * USB3 pair is modelled here; the PCIe gates are added later with PCIe.
-+ * behind the two combo-PHYs: USB3 at offset 0x0008, PCIe at 0x0004.
-+ *
-+ * SUBSYS_PCIE_BGR bit1 (PCIE_PERSTN, the controller's internal PERST
-+ * generator) is deliberately not exported. On this board PERST reaches the
-+ * device over a GPIO, and the bit reads 0 while a link is up -- an id nobody
-+ * claims would be dead text in a binding header we then keep forever.
-  */
- #ifndef _DT_BINDINGS_CLK_SUN60I_A733_SERDES_CCU_H_
- #define _DT_BINDINGS_CLK_SUN60I_A733_SERDES_CCU_H_
- 
- #define CLK_USB3_ACLK		0
- #define CLK_USB3_HCLK		1
-+#define CLK_PCIE_SLV_ACLK	2
-+#define CLK_PCIE_MST_ACLK	3
-+#define CLK_PCIE_HCLK		4
-+#define CLK_COMBPHY1_REFCLK	5
- 
- #endif
-diff --git a/drivers/clk/sunxi-ng/ccu-sun60i-a733-serdes.c b/drivers/clk/sunxi-ng/ccu-sun60i-a733-serdes.c
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
+@@ -2059,15 +2059,22 @@ usb3_hs: endpoint {
+ 		 */
+ 		serdes_ccu: clock-controller@6c00000 {
+ 			compatible = "allwinner,sun60i-a733-serdes-ccu";
+-			reg = <0x0 0x06c00000 0x0 0x10>;
++			/*
++			 * 0x100, not 0x10: the PCIe bus gates sit at 0x0004 and
++			 * the COMB1 reference-clock gate at 0x00f0, so the
++			 * window has to reach past the USB3 register this node
++			 * started with.
++			 */
++			reg = <0x0 0x06c00000 0x0 0x100>;
+ 			/*
+ 			 * The two bus-matrix gates that feed the whole SERDES
+ 			 * block: AHB 0x05C0 bit8 and
+ 			 * MBUS 0x05E0 bit28. They are the upstream of the
+ 			 * per-device gates in this page.
+ 			 */
+-			clocks = <&ccu CLK_BUS_SERDES>, <&ccu CLK_MBUS_SERDES>;
+-			clock-names = "ahb", "mbus";
++			clocks = <&ccu CLK_BUS_SERDES>, <&ccu CLK_MBUS_SERDES>,
++				 <&rtc_ccu CLK_RTC_DCXO_SERDES1>;
++			clock-names = "ahb", "mbus", "dcxo-serdes1";
+ 			resets = <&ccu RST_BUS_SERDES>;
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
 --- a/drivers/clk/sunxi-ng/ccu-sun60i-a733-serdes.c
 +++ b/drivers/clk/sunxi-ng/ccu-sun60i-a733-serdes.c
 @@ -62,6 +62,8 @@
@@ -92,7 +92,7 @@ diff --git a/drivers/clk/sunxi-ng/ccu-sun60i-a733-serdes.c b/drivers/clk/sunxi-n
  #define SUN60I_A733_SUBSYS_USB3P1_BGR_REG	0x0008
  
  /*
-@@ -103,17 +105,67 @@
+@@ -103,17 +105,67 @@ static SUNXI_CCU_GATE_DATA(usb3_hclk_clk, "usb3-hclk",
  			   SUN60I_A733_SUBSYS_USB3P1_BGR_REG, BIT(16),
  			   CLK_IGNORE_UNUSED);
  
@@ -161,32 +161,29 @@ diff --git a/drivers/clk/sunxi-ng/ccu-sun60i-a733-serdes.c b/drivers/clk/sunxi-n
  };
  
  /*
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
---- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2055,15 +2055,22 @@
- 		 */
- 		serdes_ccu: clock-controller@6c00000 {
- 			compatible = "allwinner,sun60i-a733-serdes-ccu";
--			reg = <0x0 0x06c00000 0x0 0x10>;
-+			/*
-+			 * 0x100, not 0x10: the PCIe bus gates sit at 0x0004 and
-+			 * the COMB1 reference-clock gate at 0x00f0, so the
-+			 * window has to reach past the USB3 register this node
-+			 * started with.
-+			 */
-+			reg = <0x0 0x06c00000 0x0 0x100>;
- 			/*
- 			 * The two bus-matrix gates that feed the whole SERDES
- 			 * block: AHB 0x05C0 bit8 and
- 			 * MBUS 0x05E0 bit28. They are the upstream of the
- 			 * per-device gates in this page.
- 			 */
--			clocks = <&ccu CLK_BUS_SERDES>, <&ccu CLK_MBUS_SERDES>;
--			clock-names = "ahb", "mbus";
-+			clocks = <&ccu CLK_BUS_SERDES>, <&ccu CLK_MBUS_SERDES>,
-+				 <&rtc_ccu CLK_RTC_DCXO_SERDES1>;
-+			clock-names = "ahb", "mbus", "dcxo-serdes1";
- 			resets = <&ccu RST_BUS_SERDES>;
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
+--- a/include/dt-bindings/clock/sun60i-a733-serdes-ccu.h
++++ b/include/dt-bindings/clock/sun60i-a733-serdes-ccu.h
+@@ -3,13 +3,21 @@
+  * A733 (sun60iw2) SERDES subsystem clock indices.
+  *
+  * SERDES_SUBSYS_APP at 0x06C00000 gates the bus clocks of the devices sitting
+- * behind the two combo-PHYs: USB3 at offset 0x0008, PCIe at 0x0004. Only the
+- * USB3 pair is modelled here; the PCIe gates are added later with PCIe.
++ * behind the two combo-PHYs: USB3 at offset 0x0008, PCIe at 0x0004.
++ *
++ * SUBSYS_PCIE_BGR bit1 (PCIE_PERSTN, the controller's internal PERST
++ * generator) is deliberately not exported. On this board PERST reaches the
++ * device over a GPIO, and the bit reads 0 while a link is up -- an id nobody
++ * claims would be dead text in a binding header we then keep forever.
+  */
+ #ifndef _DT_BINDINGS_CLK_SUN60I_A733_SERDES_CCU_H_
+ #define _DT_BINDINGS_CLK_SUN60I_A733_SERDES_CCU_H_
+ 
+ #define CLK_USB3_ACLK		0
+ #define CLK_USB3_HCLK		1
++#define CLK_PCIE_SLV_ACLK	2
++#define CLK_PCIE_MST_ACLK	3
++#define CLK_PCIE_HCLK		4
++#define CLK_COMBPHY1_REFCLK	5
+ 
+ #endif

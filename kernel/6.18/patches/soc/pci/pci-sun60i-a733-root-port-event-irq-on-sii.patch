@@ -111,7 +111,61 @@ aer_dev_correctable both rise.
 
 Assisted-by: Claude
 
-diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/controller/dwc/pcie-sun60i-a733.c
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
+@@ -2019,8 +2019,14 @@ pcie: pcie@6000000 {
+ 			 */
+ 			ranges = <0x81000000 0x0 0x21000000 0x0 0x21000000 0x0 0x01000000>,
+ 				 <0x82000000 0x0 0x22000000 0x0 0x22000000 0x0 0x06000000>;
+-			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupt-names = "msi";
++			/*
++			 * PCIE0_SII (INTID 184) carries the root port's own AER,
++			 * PME and link events; PCIE0_MSI (INTID 185) is the DWC
++			 * MSI receiver for the endpoints. UM V1.00 chapter 12.
++			 */
++			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "sii", "msi";
+ 			clocks = <&ccu CLK_PCIE_AUX>,
+ 				 <&ccu CLK_PCIE_AXI_SLV>,
+ 				 <&ccu CLK_BUS_ITS_PCIE0_ACLK>,
+@@ -2045,6 +2051,35 @@ pcie: pcie@6000000 {
+ 			vpcie3v3-supply = <&reg_pcie_pwr>;
+ 			power-domains = <&pck600 PD_PCIE>;
+ 			status = "okay";
++
++			/*
++			 * The SII demultiplexer. Its only source is the root
++			 * port's own event interrupt (AER, PME, link bandwidth),
++			 * hwirq 0; the driver says why that runs on INTx.
++			 */
++			pcie_intc: legacy-interrupt-controller {
++				interrupt-controller;
++				#address-cells = <0>;
++				#interrupt-cells = <1>;
++			};
++
++			/*
++			 * The root port, 00:00.0, named so its interrupt comes
++			 * from its own node rather than from a host-level
++			 * interrupt-map. There is deliberately no such map:
++			 * with one, an endpoint's INTA resolved to this same
++			 * hwirq, which only root-port events ever raise. Without
++			 * one an INTx-only endpoint fails to get an IRQ, loudly,
++			 * because downstream INTx has no source on this SoC.
++			 */
++			pcie@0,0 {
++				device_type = "pci";
++				reg = <0x0 0x0 0x0 0x0 0x0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				ranges;
++				interrupts-extended = <&pcie_intc 0>;
++			};
+ 		};
+ 
+ 		/*
 --- a/drivers/pci/controller/dwc/pcie-sun60i-a733.c
 +++ b/drivers/pci/controller/dwc/pcie-sun60i-a733.c
 @@ -12,9 +12,11 @@
@@ -136,10 +190,11 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
  #include <linux/module.h>
  #include <linux/moduleparam.h>
  #include <linux/of.h>
-@@ -56,6 +60,44 @@
+@@ -55,6 +59,44 @@
+ #define  SUN60I_A733_PCIE_SMLH_LINK_UP		BIT(0)
  #define  SUN60I_A733_PCIE_RDLH_LINK_UP		BIT(1)
  
- /*
++/*
 + * The System Information Interface: the DesignWare core's sideband outputs,
 + * latched by Allwinner's glue into write-1-to-clear status registers and ORed
 + * onto one GIC line, PCIE0_SII (UM V1.00 18.3.8.60-18.3.8.67; INTID 184 =
@@ -177,11 +232,10 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
 +	 SUN60I_A733_PCIE_SII_LINK_AUTO_BW_INT |		\
 +	 SUN60I_A733_PCIE_SII_BW_MGT_INT)
 +
-+/*
+ /*
   * PCIe CEM 3.0: at least 100 ms between the reference clock being valid and
   * PERST# being released, and the spec's T_RRS before the first config request.
-  * dw_pcie_wait_for_link() covers the second; this covers the first.
-@@ -90,6 +132,11 @@
+@@ -90,6 +132,11 @@ struct sun60i_a733_pcie {
  	struct phy		*phy;
  	struct gpio_desc	*perst;
  	struct regulator	*vpcie3v3;
@@ -193,7 +247,7 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
  };
  
  static struct sun60i_a733_pcie *to_sun60i_a733_pcie(struct dw_pcie *pci)
-@@ -144,12 +191,225 @@
+@@ -144,12 +191,225 @@ static bool sun60i_a733_pcie_link_up(struct dw_pcie *pci)
  }
  
  /*
@@ -228,7 +282,7 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
 + * is lost. There is no host-level interrupt-map, so an INTx-only endpoint gets
 + * no IRQ rather than one that never fires. MSI and MSI-X endpoints are
 + * unaffected.
-+ */
+  */
 +
 +/*
 + * Whether the root port still has an event its services have not taken: the
@@ -243,7 +297,7 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
 + * the port would go deaf until reboot. Re-reading the source after each pass
 + * makes the handler correct under both behaviours; which one the silicon has
 + * is still to be measured.
-  */
++ */
 +static bool sun60i_a733_pcie_rp_pending(struct sun60i_a733_pcie *pcie)
 +{
 +	struct dw_pcie *pci = &pcie->pci;
@@ -423,7 +477,7 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
  };
  
  static const struct dw_pcie_ops sun60i_a733_dw_pcie_ops = {
-@@ -274,6 +534,11 @@
+@@ -274,6 +534,11 @@ static int sun60i_a733_pcie_probe(struct platform_device *pdev)
  	if (IS_ERR(pcie->app))
  		return PTR_ERR(pcie->app);
  
@@ -435,59 +489,3 @@ diff --git a/drivers/pci/controller/dwc/pcie-sun60i-a733.c b/drivers/pci/control
  	for (i = 0; i < ARRAY_SIZE(pcie->clks); i++)
  		pcie->clks[i].id = sun60i_a733_pcie_clks[i];
  	ret = devm_clk_bulk_get(dev, ARRAY_SIZE(pcie->clks), pcie->clks);
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
---- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2015,8 +2015,14 @@
- 			 */
- 			ranges = <0x81000000 0x0 0x21000000 0x0 0x21000000 0x0 0x01000000>,
- 				 <0x82000000 0x0 0x22000000 0x0 0x22000000 0x0 0x06000000>;
--			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-names = "msi";
-+			/*
-+			 * PCIE0_SII (INTID 184) carries the root port's own AER,
-+			 * PME and link events; PCIE0_MSI (INTID 185) is the DWC
-+			 * MSI receiver for the endpoints. UM V1.00 chapter 12.
-+			 */
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "sii", "msi";
- 			clocks = <&ccu CLK_PCIE_AUX>,
- 				 <&ccu CLK_PCIE_AXI_SLV>,
- 				 <&ccu CLK_BUS_ITS_PCIE0_ACLK>,
-@@ -2041,6 +2047,35 @@
- 			vpcie3v3-supply = <&reg_pcie_pwr>;
- 			power-domains = <&pck600 PD_PCIE>;
- 			status = "okay";
-+
-+			/*
-+			 * The SII demultiplexer. Its only source is the root
-+			 * port's own event interrupt (AER, PME, link bandwidth),
-+			 * hwirq 0; the driver says why that runs on INTx.
-+			 */
-+			pcie_intc: legacy-interrupt-controller {
-+				interrupt-controller;
-+				#address-cells = <0>;
-+				#interrupt-cells = <1>;
-+			};
-+
-+			/*
-+			 * The root port, 00:00.0, named so its interrupt comes
-+			 * from its own node rather than from a host-level
-+			 * interrupt-map. There is deliberately no such map:
-+			 * with one, an endpoint's INTA resolved to this same
-+			 * hwirq, which only root-port events ever raise. Without
-+			 * one an INTx-only endpoint fails to get an IRQ, loudly,
-+			 * because downstream INTx has no source on this SoC.
-+			 */
-+			pcie@0,0 {
-+				device_type = "pci";
-+				reg = <0x0 0x0 0x0 0x0 0x0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				ranges;
-+				interrupts-extended = <&pcie_intc 0>;
-+			};
- 		};
- 
- 		/*

@@ -133,10 +133,11 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3069,6 +3069,23 @@
+@@ -3084,6 +3084,23 @@ usb_con_sbu: endpoint {
+ 			};
  		};
  
- 		/*
++		/*
 +		 * RTC time counter, alarm 0 and GP_DATA_REG0-7 (A733 UM 9.1.6),
 +		 * the registers below the DCXO control group that rtc_ccu maps.
 +		 * Linear 16-bit day counter plus hour/minute/second (9.1.7.5,
@@ -153,7 +154,6 @@ Assisted-by: Claude
 +			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>;
 +		};
 +
-+		/*
+ 		/*
  		 * RTC-CCU (PRCM @0x07090000, AON domain). Provides the two SERDES
  		 * DCXO gates (XO_CTRL1 @0x16c bit4/5); the COMB0 combo-PHY consumes
- 		 * dcxo-serdes0. Parent = r-ahb (from the R-CCU). Driver = patch `clk-sunxi-ng-a733-add-minimal-rtc-ccu`.

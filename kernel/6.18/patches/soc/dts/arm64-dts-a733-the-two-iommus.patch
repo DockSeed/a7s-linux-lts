@@ -55,10 +55,11 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1027,6 +1027,61 @@
+@@ -985,6 +985,61 @@ gic: interrupt-controller@3400000 {
+ 			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
  		};
  
- 		/*
++		/*
 +		 * The two IOMMUs (UM chapter 10). Each translates for its own
 +		 * masters through its own page table; the cell of `iommus` is
 +		 * the master index:
@@ -113,7 +114,6 @@ Assisted-by: Claude
 +			#iommu-cells = <1>;
 +		};
 +
-+		/*
+ 		/*
  		 * PCK-600 power controller (Arm CoreLink PCK-600 / PPU). Provides
  		 * the SoC power domains; PD_USB2 (index 8) is boot-on (on silicon,
- 		 * the 8 GiB board: status @0x07068008 = 0x8). Attach-only driver variant

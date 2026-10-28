@@ -72,10 +72,9 @@ The observable it serves is `drm-a733-kms-drm-device-for-the-display-pipe`'s: /d
 
 Assisted-by: Claude
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -627,6 +627,32 @@
+@@ -586,6 +586,32 @@ scp@48100000 {
  		};
  	};
  
@@ -108,7 +107,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  	soc {
  		compatible = "simple-bus";
  		#address-cells = <2>;
-@@ -1523,16 +1549,9 @@
+@@ -1482,16 +1508,9 @@ mixer0: mixer@5100000 {
  			 * nibble 0x5). The graph says which TCON; the driver
  			 * writes the nibble.
  			 *
@@ -128,29 +127,22 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			 */
  			ports {
  				#address-cells = <1>;
-@@ -1605,22 +1624,24 @@
+@@ -1564,22 +1583,24 @@ tcon_tv1: lcd-controller@5731000 {
  			status = "okay";
  
  			/*
 -			 * The input edge, DE display pipe 0 -> TCON_TV1. Added
 -			 * with the display-engine node, because a graph edge only
 -			 * exists if both ends describe it.
--			 *
++			 * Two edges: DE display pipe 0 in on port@0, the
++			 * DisplayPort transmitter out on port@1.
+ 			 *
 -			 * The endpoint carries no reg, so its id is 0 -- and that
 -			 * is what names the mixer: sun8i_mixer_of_get_id() reads
 -			 * the REMOTE endpoint's id, so this 0 is why the block on
 -			 * the other end is mixer 0. A second display pipe arrives
 -			 * as a second endpoint here with reg = <1>, which then
 -			 * needs #address-cells/#size-cells on this port.
--			 *
--			 * Nothing reads this today: sun60i-tcon-tv.c is a plain
--			 * platform driver with no of_graph call, so the edge is
--			 * inert until a KMS driver walks it. It is here because it
--			 * is the route the hardware takes -- the register that
--			 * performs it is DE2TCON_MUX, on the DE side.
-+			 * Two edges: DE display pipe 0 in on port@0, the
-+			 * DisplayPort transmitter out on port@1.
-+			 *
 +			 * The input endpoint carries no reg, so its id is 0 --
 +			 * and that is what names the mixer:
 +			 * sun8i_mixer_of_get_id() reads the REMOTE endpoint's id,
@@ -158,7 +150,12 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
 +			 * A second display pipe arrives as a second endpoint here
 +			 * with reg = <1>, which then needs
 +			 * #address-cells/#size-cells on this port.
-+			 *
+ 			 *
+-			 * Nothing reads this today: sun60i-tcon-tv.c is a plain
+-			 * platform driver with no of_graph call, so the edge is
+-			 * inert until a KMS driver walks it. It is here because it
+-			 * is the route the hardware takes -- the register that
+-			 * performs it is DE2TCON_MUX, on the DE side.
 +			 * The output edge is what of_drm_find_bridge() resolves:
 +			 * the KMS driver asks devm_drm_of_get_bridge() for port 1
 +			 * endpoint 0 of this node, follows it to the transmitter,
@@ -169,7 +166,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			 */
  			ports {
  				#address-cells = <1>;
-@@ -1633,6 +1654,14 @@
+@@ -1592,6 +1613,14 @@ tcon_tv1_in_mixer0: endpoint {
  						remote-endpoint = <&mixer0_out_tcon_tv1>;
  					};
  				};
@@ -184,7 +181,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
  			};
  		};
  
-@@ -1712,6 +1741,38 @@
+@@ -1671,6 +1700,38 @@ edp0: displayport@5740000 {
  			phys = <&aux_hpd>, <&combophy0>;
  			phy-names = "aux-phy", "dp";
  			status = "okay";

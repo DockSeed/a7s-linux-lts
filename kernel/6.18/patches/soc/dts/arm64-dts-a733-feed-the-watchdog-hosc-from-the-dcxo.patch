@@ -47,7 +47,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -973,22 +973,21 @@
+@@ -932,22 +932,21 @@ cpu_speed_grade: cpu-speed-grade@4c {
  		 *        the register layout, not the interrupt map.
  		 * clocks UM 8.3.3: the WDT's two selectable sources are RTC_32K
  		 *        and DCXO/750, picked by WDT_CFG_REG bit[8]. "losc" is

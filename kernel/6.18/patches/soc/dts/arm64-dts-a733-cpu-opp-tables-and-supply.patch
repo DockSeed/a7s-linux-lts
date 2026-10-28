@@ -490,13 +490,13 @@ Assisted-by: Claude
  .../sun60i-a733-cubie-a7s-minimal.dts         | 371 ++++++++++++++++++
  1 file changed, 371 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1699,6 +1699,69 @@
+@@ -1657,6 +1657,69 @@ pmic@36 {
+ 				#interrupt-cells = <1>;
  
  				regulators {
- 					/*
++					/*
 +					 * The two CPU DVFS rails. They get a DT node --
 +					 * and therefore a window, and therefore the right
 +					 * to be written -- only because this patch also
@@ -559,11 +559,10 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
 +						regulator-always-on;
 +					};
 +
-+					/*
+ 					/*
  					 * SWOUT1 = reg 0x11 BIT(3) = Maxio PHY
  					 * 3v3 (board net VCC33-LCD). SWOUT2 =
- 					 * reg 0x11 BIT(4) = VCC-PH bank I/O.
-@@ -1877,3 +1940,387 @@
+@@ -1836,3 +1899,387 @@ cpupll_ccu: clock-controller@8870000 {
  		};
  	};
  };
@@ -951,5 +950,3 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
 +&cpu7 {
 +	operating-points-v2 = <&cluster1_opp>;
 +};
--- 
-2.45.0

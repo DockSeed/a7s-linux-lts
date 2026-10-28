@@ -74,7 +74,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1000,6 +1000,12 @@
+@@ -959,6 +959,12 @@ cpu_speed_grade: cpu-speed-grade@4c {
  		 *        neither rate (sunxi_wdt never calls clk_get); what the
  		 *        phandle does change is probe order, because fw_devlink
  		 *        makes the RTC-CCU a supplier of this node (patch `arm64-dts-a733-feed-the-watchdog-hosc-from-the-dcxo`).
@@ -87,7 +87,7 @@ Assisted-by: Claude
  		 */
  		wdt: watchdog@2050000 {
  			compatible = "allwinner,sun60i-a733-wdt",
-@@ -1008,6 +1014,7 @@
+@@ -967,6 +973,7 @@ wdt: watchdog@2050000 {
  			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
  			clocks = <&rtc_ccu CLK_RTC_DCXO>, <&osc32k>;
  			clock-names = "hosc", "losc";
@@ -95,7 +95,7 @@ Assisted-by: Claude
  		};
  
  		gic: interrupt-controller@3400000 {
-@@ -2318,6 +2325,33 @@
+@@ -2277,6 +2284,33 @@ nmi_intc: interrupt-controller@7010320 {
  			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
  		};
  

@@ -159,7 +159,7 @@ Assisted-by: Claude
  #include <dt-bindings/reset/sun60i-a733-ccu.h>
  #include <dt-bindings/reset/sun60i-a733-r-ccu.h>
  #include <dt-bindings/reset/sun60i-a733-serdes-ccu.h>
-@@ -1441,6 +1442,43 @@
+@@ -1400,6 +1401,43 @@ u2phy: phy@6b00000 {
  		 * unstable this is the first knob to turn.
  		 *
  		 */
@@ -203,7 +203,7 @@ Assisted-by: Claude
  		gmac0: ethernet@4500000 {
  			compatible = "allwinner,sun60iw2-gmac200",
  				     "snps,dwmac-5.30a";
-@@ -2336,3 +2374,214 @@
+@@ -2295,3 +2333,214 @@ &cpu6 {
  &cpu7 {
  	operating-points-v2 = <&cluster1_opp>;
  };

@@ -42,11 +42,9 @@ Assisted-by: Claude
  .../sun60i-a733-cubie-a7s-minimal.dts         | 37 +++++++++++++++++++
  1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-index 412164a..a95f325 100644
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1565,6 +1565,28 @@ r_ccu: clock-controller@7010000 {
+@@ -1524,6 +1524,28 @@ r_ccu: clock-controller@7010000 {
  			#reset-cells = <1>;
  		};
  
@@ -75,7 +73,7 @@ index 412164a..a95f325 100644
  		r_pio: pinctrl@7025000 {
  			compatible = "allwinner,sun60i-a733-r-pinctrl",
  				     "allwinner,sun55i-a523-r-pinctrl";
-@@ -1619,6 +1641,21 @@ pmic@36 {
+@@ -1578,6 +1600,21 @@ pmic@36 {
  				compatible = "x-powers,axp318w";
  				reg = <0x36>;
  
@@ -97,6 +95,3 @@ index 412164a..a95f325 100644
  				regulators {
  					/*
  					 * SWOUT1 = reg 0x11 BIT(3) = Maxio PHY
--- 
-2.55.0
-

@@ -24,7 +24,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -755,6 +755,50 @@ display-engine {
+@@ -729,6 +729,50 @@ display-engine {
  		status = "okay";
  	};
  
@@ -75,7 +75,7 @@ Assisted-by: Claude
  	soc {
  		compatible = "simple-bus";
  		#address-cells = <2>;
-@@ -2020,6 +2064,17 @@ edp0: displayport@5740000 {
+@@ -2024,6 +2068,17 @@ edp0: displayport@5740000 {
  			resets = <&ccu RST_BUS_EDP>;
  			phys = <&aux_hpd>, <&combophy0>;
  			phy-names = "aux-phy", "dp";

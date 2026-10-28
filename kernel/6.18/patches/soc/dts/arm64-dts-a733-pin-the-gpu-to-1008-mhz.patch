@@ -57,7 +57,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -2892,8 +2892,49 @@
+@@ -2851,8 +2851,49 @@ gpu: gpu@1800000 {
  			 * A733 user manual), so 24 MHz x 50 / 2 = 600 needs
  			 * a 1200 MHz VCO, below the floor.
  			 */

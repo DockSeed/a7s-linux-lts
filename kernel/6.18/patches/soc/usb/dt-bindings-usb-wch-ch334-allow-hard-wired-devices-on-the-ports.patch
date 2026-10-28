@@ -1,0 +1,20 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] dt-bindings: usb: wch,ch334: Allow hard wired devices on the ports
+
+The CH334 hub node is used for hubs with a soldered device on a port.
+usb-hub.yaml already allows such child nodes, but additionalProperties
+rejects them. Use unevaluatedProperties as the other hub bindings do.
+
+Assisted-by: Claude
+---
+--- a/Documentation/devicetree/bindings/usb/wch,ch334.yaml
++++ b/Documentation/devicetree/bindings/usb/wch,ch334.yaml
+@@ -46,7 +46,7 @@ required:
+   - compatible
+   - reg
+ 
+-additionalProperties: false
++unevaluatedProperties: false
+ 
+ examples:
+   - |

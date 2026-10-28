@@ -125,6 +125,7 @@ y DMABUF_HEAPS
 y DMABUF_HEAPS_CMA
 y DMABUF_HEAPS_CMA_LEGACY
 y FONT_8x16
+m USB_ONBOARD_DEV
 m DRM_POWERVR
 m DRM_EXEC
 m DRM_GPUVM
@@ -204,6 +205,7 @@ file gpu-sched.ko
 file drm_shmem_helper.ko
 file powervr.ko
 file fuse.ko
+file onboard_usb_dev.ko
 file usbserial.ko
 file cp210x.ko
 file ftdi_sio.ko

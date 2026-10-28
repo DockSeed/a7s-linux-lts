@@ -61,7 +61,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -524,14 +524,6 @@
+@@ -524,14 +524,6 @@ reg_vcc3v3: regulator-vcc3v3 {
  		regulator-always-on;
  	};
  
@@ -76,7 +76,7 @@ Assisted-by: Claude
  	/*
  	 * VCC5V0_USB20 -> the CH334F hub (USB-A J8 + on-board WiFi/BT), switched by
  	 * SGM2576 U10 whose enable is USB_HOST_EN = PM5 (schematic p7:172 / p13:92).
-@@ -1014,8 +1006,8 @@
+@@ -973,8 +965,8 @@ mmc2: mmc@4022000 {
  			pinctrl-names = "default";
  			pinctrl-0 = <&mmc2_pins>, <&mmc2_clk_pins>,
  				    <&mmc2_ds_pins>;
@@ -87,7 +87,7 @@ Assisted-by: Claude
  			bus-width = <8>;
  			max-frequency = <200000000>;
  			non-removable;
-@@ -1772,6 +1764,26 @@
+@@ -1731,6 +1723,26 @@ reg_dcdc5: dcdc5 {
  					 * that state until the net patches wire
  					 * swout1 as the gmac phy-supply.
  					 */

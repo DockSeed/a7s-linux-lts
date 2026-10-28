@@ -61,7 +61,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3366,9 +3366,9 @@
+@@ -3382,9 +3382,9 @@ / {
  	 * `nvmem-cpufreq-a733-speed-bin-from-efuse` ANDs the per-CPU masks.
  	 *
  	 * DCDC5 is one rail feeding VDD-CPUL and VDD-DSU together, so
@@ -74,7 +74,7 @@ Assisted-by: Claude
  	 */
  	cluster0_opp: opp-table-cluster0 {
  		compatible = "allwinner,sun60i-a733-operating-points";
-@@ -3690,6 +3690,169 @@
+@@ -3706,6 +3706,169 @@ opp-2002000000 {
  		};
  
  	};

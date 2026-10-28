@@ -63,6 +63,25 @@ Check: dcxo reads anything but 26000000, or combophy0 fails to probe.
 
 Assisted-by: Claude
 ---
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
+@@ -3088,10 +3088,14 @@ usb_con_sbu: endpoint {
+ 		 * RTC-CCU (PRCM @0x07090000, AON domain). Provides the two SERDES
+ 		 * DCXO gates (XO_CTRL1 @0x16c bit4/5); the COMB0 combo-PHY consumes
+ 		 * dcxo-serdes0. Parent = r-ahb (from the R-CCU). Driver = patch `clk-sunxi-ng-a733-add-minimal-rtc-ccu`.
++		 *
++		 * The window is the DCXO control group only, XO_CTRL_WP_REG 0x15c
++		 * to XO_CTRL1_REG 0x16c (UM 9.1.6), so the rtc node below 0x15c can
++		 * request its own. The driver's offsets are relative to 0x15c (`clk-sunxi-ng-a733-rtc-ccu-maps-only-the-dcxo-control-group`).
+ 		 */
+-		rtc_ccu: clock-controller@7090000 {
++		rtc_ccu: clock-controller@709015c {
+ 			compatible = "allwinner,sun60i-a733-rtc-ccu";
+-			reg = <0x0 0x07090000 0x0 0x400>;
++			reg = <0x0 0x0709015c 0x0 0x14>;
+ 			clocks = <&r_ccu CLK_R_AHB>;
+ 			clock-names = "r-ahb";
+ 			#clock-cells = <1>;
 --- a/drivers/clk/sunxi-ng/ccu-sun60i-a733-rtc.c
 +++ b/drivers/clk/sunxi-ng/ccu-sun60i-a733-rtc.c
 @@ -26,9 +26,17 @@
@@ -85,22 +104,3 @@ Assisted-by: Claude
  
  /*
   * The DCXO is the SoC's high-frequency reference oscillator. Which crystal the
---- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -3072,10 +3072,14 @@
- 		 * RTC-CCU (PRCM @0x07090000, AON domain). Provides the two SERDES
- 		 * DCXO gates (XO_CTRL1 @0x16c bit4/5); the COMB0 combo-PHY consumes
- 		 * dcxo-serdes0. Parent = r-ahb (from the R-CCU). Driver = patch `clk-sunxi-ng-a733-add-minimal-rtc-ccu`.
-+		 *
-+		 * The window is the DCXO control group only, XO_CTRL_WP_REG 0x15c
-+		 * to XO_CTRL1_REG 0x16c (UM 9.1.6), so the rtc node below 0x15c can
-+		 * request its own. The driver's offsets are relative to 0x15c (`clk-sunxi-ng-a733-rtc-ccu-maps-only-the-dcxo-control-group`).
- 		 */
--		rtc_ccu: clock-controller@7090000 {
-+		rtc_ccu: clock-controller@709015c {
- 			compatible = "allwinner,sun60i-a733-rtc-ccu";
--			reg = <0x0 0x07090000 0x0 0x400>;
-+			reg = <0x0 0x0709015c 0x0 0x14>;
- 			clocks = <&r_ccu CLK_R_AHB>;
- 			clock-names = "r-ahb";
- 			#clock-cells = <1>;

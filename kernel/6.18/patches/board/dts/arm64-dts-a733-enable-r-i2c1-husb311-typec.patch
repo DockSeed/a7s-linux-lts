@@ -31,7 +31,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1611,6 +1611,19 @@
+@@ -1570,6 +1570,19 @@ r_i2c_pins: r-i2c-pins {
  				allwinner,pinmux = <2>;
  				function = "r_i2c0";
  			};
@@ -51,11 +51,10 @@ Assisted-by: Claude
  		};
  
  		/*
-@@ -1680,6 +1693,112 @@
- 				};
+@@ -1640,6 +1653,112 @@ reg_swout2: swout2 {
  			};
  		};
-+
+ 
 +		/*
 +		 * S_TWI1 @ 0x07084000 (the memory map of the A733 user manual: SYSCPUS_APBS1,
 +		 * 0x07084000-0x07084FFF), IRQ GIC_SPI 204 (S_TWI1 intid 236,
@@ -161,6 +160,7 @@ Assisted-by: Claude
 +				};
 +			};
 +		};
- 
++
  		/*
  		 * RTC-CCU (PRCM @0x07090000, AON domain). Provides the two SERDES
+ 		 * DCXO gates (XO_CTRL1 @0x16c bit4/5); the COMB0 combo-PHY consumes

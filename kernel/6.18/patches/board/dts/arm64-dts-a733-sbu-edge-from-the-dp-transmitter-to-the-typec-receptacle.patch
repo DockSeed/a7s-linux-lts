@@ -136,7 +136,7 @@ Assisted-by: Claude
 
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1743,23 +1743,30 @@
+@@ -1702,23 +1702,30 @@ edp0: displayport@5740000 {
  			status = "okay";
  
  			/*
@@ -183,7 +183,7 @@ Assisted-by: Claude
  			 */
  			ports {
  				#address-cells = <1>;
-@@ -1772,6 +1779,14 @@
+@@ -1731,6 +1738,14 @@ edp0_in_tcon_tv1: endpoint {
  						remote-endpoint = <&tcon_tv1_out_edp0>;
  					};
  				};
@@ -198,7 +198,7 @@ Assisted-by: Claude
  			};
  		};
  
-@@ -2570,6 +2585,18 @@
+@@ -2529,6 +2544,18 @@ usb_con: connector {
  					 * and is inert here:
  					 * dwc3 only builds a role switch when
  					 * usb-role-switch is set, which it is not.
@@ -217,7 +217,7 @@ Assisted-by: Claude
  					 */
  					/*
  					 * Declare that this port itself supports
-@@ -2616,6 +2643,13 @@
+@@ -2575,6 +2602,13 @@ usb_con_ss: endpoint {
  								remote-endpoint = <&combophy0_ss>;
  							};
  						};

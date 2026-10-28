@@ -18,10 +18,9 @@ thermal-sensor@2522000. Pending on silicon: as the driver patch.
 
 Assisted-by: Claude
 ---
-diff -uNr a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1050,6 +1050,19 @@
+@@ -1024,6 +1024,19 @@ sid: efuse@3006000 {
  			cpu_speed_grade: cpu-speed-grade@4c {
  				reg = <0x4c 4>;
  			};
@@ -41,7 +40,7 @@ diff -uNr a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/ar
  		};
  
  		/*
-@@ -2376,11 +2389,8 @@
+@@ -2380,11 +2393,8 @@ u2phy: phy@6b00000 {
  		 * meaningless. It must be the 24 MHz SYS_CLK24M net, never the 26 MHz
  		 * DCXO.
  		 *
@@ -55,7 +54,7 @@ diff -uNr a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/ar
  		 * No allwinner,sram either; that is an H616 erratum, not this part.
  		 */
  		ths: thermal-sensor@2522000 {
-@@ -2390,6 +2400,8 @@
+@@ -2394,6 +2404,8 @@ ths: thermal-sensor@2522000 {
  			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_GPADC0_24M>;
  			clock-names = "bus", "mod";
  			resets = <&ccu RST_BUS_THS>;

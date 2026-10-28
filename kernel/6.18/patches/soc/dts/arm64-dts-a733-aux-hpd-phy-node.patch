@@ -107,15 +107,12 @@ have to show is in `phy-allwinner-a733-aux-hpd-phy`'s header -- the three regist
 
 Assisted-by: Claude
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -1449,6 +1449,45 @@
- 					remote-endpoint = <&usb_con_ss>;
- 				};
+@@ -1410,6 +1410,45 @@ combophy0_ss: endpoint {
  			};
-+		};
-+
+ 		};
+ 
 +		/*
 +		 * DisplayPort AUX/HPD analog front end (patch `phy-allwinner-a733-aux-hpd-phy`). Three registers
 +		 * at SERDES_SUBSYS_APP + 0x1e00..0x1e08 (UM
@@ -153,6 +150,8 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts b/a
 +			resets = <&ccu RST_BUS_SERDES>;
 +			#phy-cells = <0>;
 +			status = "okay";
- 		};
- 
++		};
++
  		/*
+ 		 * USB2.0 UTMI companion PHY for the USB3 DRD (net USB2-U2). The dwc3
+ 		 * core soft-reset needs this out of power-down. Driver = patch `phy-allwinner-a733-add-usb2-companion-phy`

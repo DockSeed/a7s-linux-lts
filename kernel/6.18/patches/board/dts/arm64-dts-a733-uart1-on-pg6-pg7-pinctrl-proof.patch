@@ -81,7 +81,7 @@ Assisted-by: Claude
  	};
  
  	chosen {
-@@ -761,6 +762,12 @@ uart0_pb_pins: uart0-pb-pins {
+@@ -720,6 +721,12 @@ uart0_pb_pins: uart0-pb-pins {
  				function = "uart0";
  			};
  
@@ -94,7 +94,7 @@ Assisted-by: Claude
  			/*
  			 * SD splits CLK from CMD+data because the vendor drives
  			 * them differently, and the difference is measurable on
-@@ -1119,6 +1126,27 @@ uart0: serial@2500000 {
+@@ -1078,6 +1085,27 @@ uart0: serial@2500000 {
  			status = "okay";
  		};
  

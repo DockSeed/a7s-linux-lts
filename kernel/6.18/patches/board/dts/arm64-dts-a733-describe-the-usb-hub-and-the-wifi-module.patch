@@ -1,0 +1,138 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] arm64: dts: a733: describe the USB hub and the WiFi module
+
+The USB-A port J8 and the WiFi/BT module are behind a WCH CH334F hub (U9)
+on USB1. The hub is fed from DCDC1 (VCC_3V3_USB20HUB, R44 0R) and has no
+reset line: XRSTJ is wired to unfitted parts only. PM5 does not power the
+hub, it only enables U10, the VBUS switch of J8.
+
+The module U3 (AIC8800D80) sits on port 1 of the hub. Its supply WIFI_3V3
+is the output of load switch Q8, enabled by USB_WIFI_PWR (PM0); its CHIP_EN
+pin is WL-REG-ON (PM1), active high.
+
+Until now the kernel did not control the power of the module: PM0 and PM1
+were two always-on regulators, and the hub had no node. Describe both
+devices, so that onboard_usb_dev owns the module's supply and its reset line
+and releases reset 14 ms after enabling the supply (a fixed delay of the
+onboard_usb_dev entry, not measured): a hub@1 node on ehci1 with its two supplies from DCDC1, and the module as wifi@1 below it,
+with WIFI_3V3 as a plain regulator-fixed on PM0 and CHIP_EN as its
+reset-gpios on PM1. This replaces `arm64-dts-a733-power-the-onboard-wifi-module`;
+one rail has one owner.
+
+The hub itself is not switched by this: DCDC1 stays on and the hub has no
+reset line, so onboard_usb_dev cannot power it off or reset it. The patch
+does not address the error that the hub's first enumeration used to show,
+
+  usb 3-1: device descriptor read/64, error -71
+
+and makes no claim about it.
+
+DCDC1 gets a node, always on and without a voltage window like the other
+rails of the PMIC, because onboard_usb_dev disables the hub's supplies when
+the hub goes away.
+
+The comment on the PM5 regulator said it powers the hub and the module. It
+only switches VBUS of J8.
+
+Needs the CH334 and AIC8800D80 entries of onboard_usb_dev and the matching
+bindings, and USB_ONBOARD_DEV in the config. The Bluetooth function of the
+module needs `bluetooth-btusb-request-the-reset-gpio-only-where-a-handler-uses-it`,
+because btusb would otherwise request the reset line that onboard_usb_dev
+holds.
+
+Assisted-by: Claude
+---
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
+@@ -528,9 +528,10 @@ reg_vcc3v3: regulator-vcc3v3 {
+ 	};
+ 
+ 	/*
+-	 * VCC5V0_USB20 -> the CH334F hub (USB-A J8 + on-board WiFi/BT), switched by
+-	 * SGM2576 U10 whose enable is USB_HOST_EN = PM5 (schematic p7:172 / p13:92).
+-	 * Held on: the hub must be powered for J8 and the WiFi/BT module to work.
++	 * VCC5V0_USB20 -> VBUS of the USB-A port J8, switched by SGM2576 U10
++	 * whose enable is USB_HOST_EN = PM5 (schematic p7:172 / p13:92). The
++	 * CH334F hub U9 and the WiFi/BT module do not hang on it, see the hub
++	 * node on ehci1. Held on: nothing consumes it, and J8 is a host port.
+ 	 * PM5 lives on the AON S_GPIO bank (r_pio), bank index 1 (PL=0, PM=1).
+ 	 */
+ 	reg_usb_host_vbus: regulator-usb-host-vbus {
+@@ -543,6 +544,20 @@ reg_usb_host_vbus: regulator-usb-host-vbus {
+ 		regulator-always-on;
+ 	};
+ 
++	/*
++	 * WIFI_3V3 of the WiFi/BT module: load switch Q8 (WPM2015), enabled by
++	 * USB_WIFI_PWR = PM0. Not always on: onboard_usb_dev switches it before
++	 * the hub port of the module is enumerated.
++	 */
++	reg_wifi_3v3: regulator-wifi-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "wifi-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&r_pio 1 0 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	/*
+ 	 * VBUS for the Type-C J4 SuperSpeed port, switched by SGM2576 U2 whose
+ 	 * enable is USB0-DRVVBUS = PL2 (the "USB0" net name is a schematic label;
+@@ -1406,7 +1421,37 @@ ehci1: usb@4200000 {
+ 			resets = <&ccu RST_BUS_OHCI1>, <&ccu RST_BUS_EHCI1>;
+ 			phys = <&usbphy 1>;
+ 			phy-names = "usb";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			status = "okay";
++
++			/*
++			 * CH334F hub U9: VD33 and VDD5 from DCDC1 (R44 0R, L13
++			 * not fitted), always powered. XRSTJ has no SoC pin:
++			 * only unfitted parts, the hub resets itself at power
++			 * on.
++			 */
++			hub@1 {
++				compatible = "usb1a86,8091";
++				reg = <1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				vdd33-supply = <&reg_dcdc1>;
++				v5-supply = <&reg_dcdc1>;
++
++				/*
++				 * AIC8800D80 WiFi/BT module U3 (FCU760K) on port 1,
++				 * soldered. CHIP_EN is WL-REG-ON = PM1, active
++				 * high: onboard_usb_dev holds it low until the
++				 * supply is stable, then releases it.
++				 */
++				wifi@1 {
++					compatible = "usba69c,8d80";
++					reg = <1>;
++					vdd-supply = <&reg_wifi_3v3>;
++					reset-gpios = <&r_pio 1 1 GPIO_ACTIVE_LOW>;
++				};
++			};
+ 		};
+ 
+ 		ohci1: usb@4200400 {
+@@ -2524,6 +2569,18 @@ pmic@36 {
+ 				#interrupt-cells = <1>;
+ 
+ 				regulators {
++					/*
++					 * VCC-3V3-SYS: the 3.3 V system rail, among others the
++					 * supply of the USB hub U9 (VCC_3V3_USB20HUB). Always on:
++					 * the hub driver switches its supplies with the hub, and
++					 * this one must not go. Like the other rails here it
++					 * carries no voltage window.
++					 */
++					reg_dcdc1: dcdc1 {
++						regulator-name = "vcc-3v3-sys";
++						regulator-always-on;
++					};
++
+ 					/*
+ 					 * The two CPU DVFS rails. They get a DT node --
+ 					 * and therefore a window, and therefore the right
