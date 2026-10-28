@@ -17,6 +17,11 @@ may be short). No schedule is promised for new releases.
 
 Nothing yet.
 
+## [6.18.59-T2] - 2026-10-28
+
+Test build of the release 6.18.59-R1 below: same recipe, built by the release
+workflow on GitHub.
+
 ## [6.18.59-R1] - 2026-10-28
 
 First release.
@@ -35,7 +40,7 @@ First release.
   mapper (crypt, thin provisioning, snapshots), NBD, common USB network
   adapters, USB video and audio class, USB serial adapters, kTLS, BBR and CAKE.
 - Config for security and tracing: AppArmor as the default LSM with Yama,
-  Landlock, Lockdown and the BPF LSM; kernel hardening options; BTF including
+  Landlock and the BPF LSM; kernel hardening options; BTF including
   module BTF, the function tracer with fprobe, syscall tracepoints and tc BPF.
 - A pwm-fan on header J7 as a cooling device of both CPU thermal zones.
 - Release files, built by GitHub Actions from the tagged commit with
