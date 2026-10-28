@@ -17,6 +17,30 @@ may be short). No schedule is promised for new releases.
 
 Nothing yet.
 
+## [6.18.59-T3] - 2026-10-28
+
+Test build.
+
+### Added
+
+- Device tree nodes for the on-board USB hub (WCH CH334F) and the AIC8800D80
+  WiFi/Bluetooth module behind it: `onboard_usb_dev` (built as a module) owns
+  the module's supply and its reset line. Backports of the CH334 binding and its
+  `onboard_usb_dev` entry, a binding and an `onboard_usb_dev` entry for the
+  AIC8800D80.
+- Names for the I/O supplies of the remaining pin banks, from the schematic;
+  bank PF sets its withstand mode together with its supply.
+
+### Changed
+
+- btusb requests the reset GPIO only for devices whose reset handler uses it.
+
+### Fixed
+
+- The AIC8800 drivers keep their data on their own USB interface instead of
+  the USB device, whose driver data belongs to `onboard_usb_dev`. A disconnect
+  of the module no longer ends in an oops.
+
 ## [6.18.59-T2] - 2026-10-28
 
 Test build of the release 6.18.59-R1 below: same recipe, built by the release
