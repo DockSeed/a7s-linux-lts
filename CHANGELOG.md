@@ -17,6 +17,11 @@ may be short). No schedule is promised for new releases.
 
 Nothing yet.
 
+## [6.18.59-R1] - 2026-10-29
+
+First release: the same recipe as the test build 6.18.59-T4; the sections
+below list what it contains. No further releases or updates are promised.
+
 ## [6.18.59-T4] - 2026-10-29
 
 Test build.
