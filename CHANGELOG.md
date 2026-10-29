@@ -15,7 +15,11 @@ may be short). No schedule is promised for new releases.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- The A733 r-pinctrl leaves the withstand voltage of banks PL and PM as the
+  boot chain set it; the boot no longer logs
+  `Couldn't set bank PL I/O bias: -22`.
 
 ## [6.18.59-T3] - 2026-10-28
 
