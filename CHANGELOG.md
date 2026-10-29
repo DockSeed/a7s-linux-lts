@@ -15,6 +15,12 @@ may be short). No schedule is promised for new releases.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [6.18.59-T4] - 2026-10-29
+
+Test build.
+
 ### Fixed
 
 - The A733 r-pinctrl leaves the withstand voltage of banks PL and PM as the
