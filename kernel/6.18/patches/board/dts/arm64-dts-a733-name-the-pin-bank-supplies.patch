@@ -25,7 +25,7 @@ the bank's withstand mode and says so. Name the supplies from the schematic
   PJ    VCC33-LCD, SWOUT1, no series part.
   PM    (r_pio) The VCC-PM ball reaches VCC-PL (ALDO1) through RA13 (0R).
         The net named VCC-PM on CLDO1 does not reach the SoC, a CLDO1
-        phandle would write the 1.8 V mode onto a 3.3 V bank.
+        phandle would name a 1.8 V rail for a 3.3 V bank.
 
 Add ALDO1 as vcc-pl-pg-pm and BLDO1 as vcc-pe-pk-mcsi, both always on and
 without a voltage window like the other rails of the PMIC: ALDO1 feeds bank
@@ -37,10 +37,11 @@ and bank PL has none.
 Bank PL stays without a supply. Its consumer is r_i2c0 (PL0/PL1), the bus
 the PMIC sits on, and it requests its pins before the PMIC exists, so a
 vcc-pl-supply from ALDO1 would defer the controller that has to probe first
-for ALDO1 to exist. It keeps the dummy regulator and its two log lines.
+for ALDO1 to exist. It keeps the dummy regulator and its log line.
 
-The A733 r-pinctrl has its own driver, so the comment on the r_pio node
-that described the A523 driver's one-bit write is replaced.
+The A733 r-pinctrl has its own driver, which does not write the
+withstand voltage of PL and PM, so the comment on the r_pio node that
+described the A523 driver's one-bit write is replaced.
 
 This replaces `arm64-dts-a733-bank-pc-io-supply` and
 `arm64-dts-a733-bank-ph-io-supply`, which named PC and PH; this patch names
@@ -50,7 +51,7 @@ Assisted-by: Claude
 ---
 --- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s-minimal.dts
-@@ -671,6 +671,52 @@ pio: pinctrl@2000000 {
+@@ -671,6 +671,52 @@
  			interrupt-controller;
  			#interrupt-cells = <3>;
  
@@ -103,7 +104,7 @@ Assisted-by: Claude
  			uart0_pb_pins: uart0-pb-pins {
  				pins = "PB9", "PB10";
  				allwinner,pinmux = <2>;
-@@ -2295,13 +2341,10 @@ gmac0_syscon: syscon@4508000 {
+@@ -2295,13 +2341,10 @@
  		 * (root interrupt-parent). We use only PM5 as a GPIO output (VBUS
  		 * enable); the EINT domain is set up but unused.
  		 *
@@ -114,30 +115,30 @@ Assisted-by: Claude
 -		 * fixed_uV, so regulator_get_voltage() returns -EINVAL and set_io_bias
 -		 * leaves at its uV < 0 branch. A PL/PM supply needs an A733 r-pinctrl
 -		 * carrying the correct 2-bit variant -- that is `pinctrl-sunxi-add-a733-r-pinctrl`.
-+		 * The A733 has its own r-pinctrl driver with the two-bit
-+		 * SGPIO_POW_MOD_SEL (PL at 1:0, PM at 3:2). Bank PM carries a
-+		 * supply (vcc-pm-supply on r_pio), bank PL none, see the pin bank
-+		 * supplies on pio.
++		 * The A733 has its own r-pinctrl driver, which leaves the
++		 * withstand voltage of PL and PM (SGPIO_POW_MOD_SEL) as the boot
++		 * chain set it. Bank PM carries a supply (vcc-pm-supply on r_pio),
++		 * bank PL none, see the pin bank supplies on pio.
  		 */
  		r_ccu: clock-controller@7010000 {
  			compatible = "allwinner,sun60i-a733-r-ccu";
-@@ -2377,6 +2420,15 @@ r_pio: pinctrl@7025000 {
- 			interrupt-controller;
+@@ -2378,6 +2421,15 @@
  			#interrupt-cells = <3>;
  
-+			/*
+ 			/*
 +			 * Bank PM: the VCC-PM ball reaches VCC-PL, ALDO1, 3.3 V, through
 +			 * RA13 (0R); the net named VCC-PM on CLDO1 does not reach the
-+			 * SoC. SGPIO_POW_MOD_SEL 3:2 gets 10 (3.3 V mode) from it, the
-+			 * reset value. No vcc-pl-supply: see the pin bank supplies on
-+			 * pio.
++			 * SoC. The supply replaces the dummy regulator. The r-pinctrl
++			 * driver does not write SGPIO_POW_MOD_SEL from it. No
++			 * vcc-pl-supply: see the pin bank supplies on pio.
 +			 */
 +			vcc-pm-supply = <&reg_aldo1>;
 +
- 			/*
++			/*
  			 * PMU I2C = S_TWI0 on PL0/PL1 (mux 2). Pin/mux from the
  			 * pin tables (PL0 = S-TWI0-SCK, PL1 = S-TWI0-SDA)
-@@ -2574,6 +2626,27 @@ reg_dcdc5: dcdc5 {
+ 			 * and confirmed on the 6 GiB board. The pinctrl function name is
+@@ -2574,6 +2626,27 @@
  						regulator-always-on;
  					};
  
