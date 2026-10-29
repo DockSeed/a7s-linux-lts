@@ -53,12 +53,7 @@ Test build.
 
 ## [6.18.59-T2] - 2026-10-28
 
-Test build of the release 6.18.59-R1 below: same recipe, built by the release
-workflow on GitHub.
-
-## [6.18.59-R1] - 2026-10-28
-
-First release.
+Test build, the first one built by the release workflow on GitHub.
 
 ### Added
 
