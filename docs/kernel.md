@@ -92,9 +92,13 @@ Allwinner's BSP says so in its header.
 
 ## Not carried
 
-Test instruments (fault injection, debug instrumentation) are not part of the
+Test instruments (fault injection, test-only tracing) are not part of the
 series. Neither are debugfs switches and module parameters that write to
 hardware; the code behind them and the read-only status files remain.
+Diagnostic messages that only read and print are part of it: the dyndbg
+lines of `pinctrl-sunxi-instrument-the-power-source-handler` (silent until
+`dyndbg="file pinctrl-sunxi.c +p"`) and the warnings of
+`drm-a733-dp-instrument-the-training-failure-paths` on a failed link training.
 
 ## Checked
 
