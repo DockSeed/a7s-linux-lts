@@ -198,9 +198,26 @@ fb_fdt="$(label_line "${FALLBACK}" "${fallback}" fdt)"
 		"To start ${version}, change /boot/extlinux/extlinux.conf yourself."
 
 booted_root="$(root_token < "${CMDLINE}")"
-[ -n "${booted_root}" ] && [ "${booted_root}" = "$(label_line "${EXTLINUX}" "${default}" append | root_token)" ] \
-	|| skip "this system runs from another disk than the one /boot/extlinux/extlinux.conf names" \
+entry_root="$(label_line "${EXTLINUX}" "${default}" append | root_token)"
+if ! { [ -n "${booted_root}" ] && [ "${booted_root}" = "${entry_root}" ]; }; then
+	# The first start after flashing: a7s-root-identity gave the disk new IDs
+	# after the kernel command line was made. The boot entries name the ID of
+	# the disk / is on now, the command line still the image's old ID.
+	val="${entry_root#root=}"
+	case "${val}" in
+		PARTUUID=*) val="${val#PARTUUID=}"; now="$(findmnt -no PARTUUID / 2>/dev/null || true)" ;;
+		UUID=*) val="${val#UUID=}"; now="$(findmnt -no UUID / 2>/dev/null || true)" ;;
+		/dev/*) now="$(findmnt -no SOURCE / 2>/dev/null || true)" ;;
+		*) now= ;;
+	esac
+	if [ -n "${booted_root}" ] && [ -n "${now}" ] \
+		&& [ "$(printf '%s' "${val}" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "${now}" | tr '[:upper:]' '[:lower:]')" ]; then
+		skip "the boot entries were updated after this start (as on the first start after flashing)" \
+			"Restart the board once, then run: ${redo}"
+	fi
+	skip "this system runs from another disk than the one /boot/extlinux/extlinux.conf names" \
 		"Boot from the disk that holds this /boot, then run: ${redo}"
+fi
 [ -f "${IDENTITY_DONE}" ] \
 	|| skip "the first start of this system has not finished" \
 		"Restart the board once, then run: ${redo}"

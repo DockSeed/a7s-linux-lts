@@ -73,10 +73,10 @@ fetch() {  # <url> <file>
 }
 
 # The one file of SHA256SUMS whose name matches the pattern.
-pick() {  # <awk pattern>
+pick() {  # <awk pattern> <what the file is, for the message> [<what to do if it is missing>]
 	name="$(awk -v re="$1" '$2 ~ re { print $2 }' "${work}/SHA256SUMS")"
 	[ -n "${name}" ] && [ "$(printf '%s\n' "${name}" | wc -l)" = 1 ] \
-		|| die "this release does not have exactly one file like $1 (an a7s kernel release with the hook package?); nothing was changed"
+		|| die "this release does not have exactly one file for $2${3:+ ($3)}; nothing was changed"
 	printf '%s' "${name}"
 }
 
@@ -116,9 +116,9 @@ chmod 0755 "${work}"
 
 fetch "${base}/SHA256SUMS" "${work}/SHA256SUMS"
 # (the files of a release are named without "~": a test build's 6.18.59~t4-1 is 6.18.59.t4-1)
-image="$(pick '^linux-image-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$')"
-headers="$(pick '^linux-headers-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$')"
-hook="$(pick '^a7s-kernel-hook_[0-9A-Za-z.+-]+_all\.deb$')"
+image="$(pick '^linux-image-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$' "the linux-image package")"
+headers="$(pick '^linux-headers-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$' "the linux-headers package")"
+hook="$(pick '^a7s-kernel-hook_[0-9A-Za-z.+-]+_all\.deb$' "the a7s-kernel-hook package" "releases before v6.18.59-R2 do not have it${tag:+; run sudo a7s-kernel-update without a tag for the newest release}")"
 rel="${image#linux-image-}"
 rel="${rel%%_*}"
 
