@@ -12,6 +12,7 @@
 #   Image, <dtb>, config, System.map, KERNEL-ID   as built
 #   linux-image-<release>_<version>_arm64.deb     the kernel and its modules
 #   linux-headers-<release>_<version>_arm64.deb   the build environment for modules
+#   a7s-kernel-hook_<version>_all.deb             the extlinux hooks (scripts/lib/hook.sh)
 #   a7s-linux-lts-<release>-modules.tar.xz        the same modules as a tarball
 #   linux-<version>.tar.xz                        the pristine kernel source (sha256 pinned)
 #   SHA256SUMS                                    over all of the above
@@ -21,6 +22,12 @@
 # over what is left. Every module in the tarball and in the image package must
 # declare a GPL-compatible MODULE_LICENSE, and the packages must be what this
 # build made: same Image, config, System.map, device tree and modules.
+
+# The name a file has in the release. GitHub turns a "~" in the name of an
+# uploaded file (a test build's 6.18.59~t4-1) into ".", so the name is made here,
+# and SHA256SUMS lists the names the release serves. The version inside the
+# package stays as it is.
+release_file_name() { printf '%s' "${1//\~/.}"; }
 
 # MODULE_LICENSE strings that mean "free" (include/linux/module.h).
 RELEASE_MODULE_LICENSES="GPL|GPL v2|GPL and additional rights|Dual BSD/GPL|Dual MIT/GPL|Dual MPL/GPL"
@@ -64,8 +71,9 @@ stage_package() {
   [ "$(sed -n 's/^revision=//p' "${id}")" = "${A7S_KERNEL_REVISION}" ] \
     || die "package: KERNEL-ID has another revision than ${A7S_KERNEL_REVISION}"
   ver="$(deb_version)"
-  local img="linux-image-${rel}_${ver}_arm64.deb" hdr="linux-headers-${rel}_${ver}_arm64.deb"
-  for f in "${img}" "${hdr}"; do
+  local img="linux-image-${rel}_${ver}_arm64.deb" hdr="linux-headers-${rel}_${ver}_arm64.deb" hook
+  hook="$(hook_deb_name)"
+  for f in "${img}" "${hdr}" "${hook}"; do
     [ -f "$(deb_dir)/${f}" ] || die "package: $(deb_dir)/${f} is missing -- run deb first"
   done
 
@@ -130,8 +138,20 @@ stage_package() {
   for f in "${img}" "${hdr}"; do
     [ "$(dpkg-deb -f "$(deb_dir)/${f}" Version)" = "${ver}" ] || die "package: ${f}: wrong Version"
     [ "$(dpkg-deb -f "$(deb_dir)/${f}" Architecture)" = arm64 ] || die "package: ${f}: wrong Architecture"
-    cp "$(deb_dir)/${f}" "${dest}/"
+    cp "$(deb_dir)/${f}" "${dest}/$(release_file_name "${f}")"
   done
+
+  # The hook package: ours, for every architecture, with the hooks and the update command. The
+  # hooks only act on kernel packages whose maintainer is the one built here.
+  [ "$(dpkg-deb -f "$(deb_dir)/${hook}" Version)" = "${ver}" ] || die "package: ${hook}: wrong Version"
+  [ "$(dpkg-deb -f "$(deb_dir)/${hook}" Architecture)" = all ] || die "package: ${hook}: wrong Architecture"
+  [ "$(dpkg-deb -f "$(deb_dir)/${hook}" Maintainer)" = "$(dpkg-deb -f "$(deb_dir)/${img}" Maintainer)" ] \
+    || die "package: ${hook} and ${img} have different maintainers (the hook would ignore the kernel)"
+  local lhook; lhook="$(dpkg-deb -c "$(deb_dir)/${hook}")" || die "package: cannot list ${hook}"
+  for f in usr/share/kernel/postinst.d/zz-a7s-extlinux usr/share/kernel/prerm.d/a7s-extlinux etc/kernel/header_postinst.d/zz-a7s-extlinux etc/kernel/header_prerm.d/a7s-extlinux usr/sbin/a7s-kernel-update; do
+    grep -q " \./${f}\$" <<<"${lhook}" || die "package: ${hook} has no /${f}"
+  done
+  cp "$(deb_dir)/${hook}" "${dest}/$(release_file_name "${hook}")"
 
   # Same bytes for the same inputs: sorted names, no owners, the build time as mtime.
   local mods="a7s-linux-lts-${rel}-modules.tar.xz"

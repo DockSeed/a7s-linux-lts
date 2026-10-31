@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# a7s-extlinux -- run by the headers package's prerm (with --exit-on-error, so a
+# failure stops the removal): the headers of a kernel that extlinux.conf or
+# extlinux-fallback.conf starts are not removed. The check is the one of the
+# kernel package, in /usr/share/kernel/prerm.d.
+hook="${A7S_ROOT_DIR:-}/usr/share/kernel/prerm.d/a7s-extlinux"
+[ -x "${hook}" ] || exit 0
+exec env A7S_KERNEL_HOOK_HEADERS=1 "${hook}" "$@"

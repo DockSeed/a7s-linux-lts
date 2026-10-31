@@ -1,0 +1,284 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# zz-a7s-extlinux -- make a newly installed a7s kernel the one that
+# /boot/extlinux/extlinux.conf boots, and keep the kernel that booted well in
+# extlinux-fallback.conf (safe mode, which U-Boot boots after the boot limit).
+# Run by the kernel package's postinst (run-parts of /usr/share/kernel/postinst.d,
+# sorted with /etc/kernel/postinst.d, so after DKMS) as: <version> <image path>,
+# and by the headers package's postinst through the wrapper in
+# /etc/kernel/header_postinst.d (<version>). Only for an install or an upgrade
+# of the package (postinst configure), and for dpkg-reconfigure.
+#
+# It changes the two files only when it is sure that this /boot is the one the
+# board booted from, and says so when it is not; it never fails the install for
+# that reason. It does nothing for a kernel that is not ours and nothing in a
+# chroot (the image recipe writes extlinux itself).
+#
+# The kernel and device tree lines of the default label are what has just booted
+# well, so they move to the fallback file; the new kernel becomes the default.
+# That holds only if the default is the running kernel: /boot/vmlinuz-<release>
+# for <release> = uname -r, or /boot/Image with the checksum BUILD-ID has. If
+# the previous install was not booted yet (/var/lib/a7s/kernel-pending names it
+# and is not the running kernel), the default is replaced and the fallback
+# stays. The append lines are never touched.
+#
+# The new kernel needs the WLAN driver when the running one has it: no
+# aic8800_fdrv.ko for it under /usr/lib/modules means no new default. The
+# driver is built by DKMS, when the headers package is set up. If that comes
+# after the image package (apt sets them up in either order), this script notes
+# the version in /var/lib/a7s/kernel-waiting and waits; the run from the headers
+# package then makes the entry, and only for that version. Any other run from
+# the headers package (a reinstall of old headers) does nothing.
+#
+# Safe mode: the only change allowed is to make the kernel of the safe-mode
+# entry the default again (its package configured again). The running kernel is
+# that kernel, so no fallback moves and nothing is pending; the boot counter is
+# cleared as a7s-boot-good.service does, so that the next boot is a normal one.
+#
+# Order, as in a7s-root-identity: fallback file, then extlinux.conf, then the
+# pending file; each is written beside the old one, flushed and renamed, and the
+# directory is flushed.
+#
+# A7S_ROOT_DIR names a tree to work on instead of / (for tests).
+set -eu
+
+ROOT="${A7S_ROOT_DIR:-}"
+EXTLINUX="${ROOT}/boot/extlinux/extlinux.conf"
+FALLBACK="${ROOT}/boot/extlinux/extlinux-fallback.conf"
+BUILD_ID="${ROOT}/boot/BUILD-ID"
+STATE_DIR="${ROOT}/var/lib/a7s"
+IDENTITY_DONE="${STATE_DIR}/root-identity.done"
+PENDING="${STATE_DIR}/kernel-pending"
+CMDLINE="${ROOT}/proc/cmdline"
+SYSTEMD_RUN="${ROOT}/run/systemd/system"
+MODULES="${ROOT}/usr/lib/modules"
+WLAN_MODULE="aic8800_fdrv.ko*"
+KERNEL_DTB="allwinner/sun60i-a733-cubie-a7s.dtb"
+WAITING="${STATE_DIR}/kernel-waiting"
+NEW=".a7s-new"
+FILE_MODE=0644
+BUSYBOX="${ROOT}/usr/bin/busybox"
+BOOT_COUNTER=0x0709011C
+
+version="${1:-}"
+# DEB_MAINT_PARAMS is set by the package's postinst: "configure <old version>",
+# or abort-remove, abort-upgrade, ... when dpkg undoes something -- not an
+# install, so nothing to do. Without it (run by hand), it is an install.
+# shellcheck disable=SC2086
+set -- ${DEB_MAINT_PARAMS:-configure}
+[ "${1:-}" = configure ] || exit 0
+
+say() { printf 'a7s-kernel-hook: %s\n' "$*" >&2; }
+die() { say "$*"; exit 1; }
+
+# Messages are two lines: what happens at the next start, and what the user can do.
+current="the kernel it started before"
+redo="sudo dpkg-reconfigure linux-image-${version}"
+case "${version}" in
+	*-r*) install_again="sudo a7s-kernel-update v${version%-r*}-R${version##*-r}" ;;
+	*) install_again="sudo apt install --reinstall ./linux-image-${version}_*.deb" ;;
+esac
+
+kernel_name() {  # <kernel path in extlinux.conf>
+	case "$1" in
+		/boot/vmlinuz-*) printf '%s' "${1#/boot/vmlinuz-}" ;;
+		*) printf '%s' "the image's own kernel" ;;
+	esac
+}
+
+# The kernel is installed but extlinux stays as it is.
+skip() {  # <why> <what the user can do>
+	say "kernel ${version} is installed, but the next start still uses ${current}: $1."
+	say "$2"
+	exit 0
+}
+
+trap 'rm -f "${EXTLINUX}${NEW}" "${FALLBACK}${NEW}" "${PENDING}${NEW}"' EXIT
+
+# --- the files ------------------------------------------------------------------
+
+default_label() {  # <file>
+	awk '$1 == "default" { print $2; exit }' "$1"
+}
+
+label_line() {  # <file> <label> <key> -- what follows the key in the label's block
+	awk -v label="$2" -v key="$3" '
+		$1 == "label" { in_label = ($2 == label); next }
+		in_label && $1 == key { sub(/^[ \t]*[^ \t]+[ \t]+/, ""); print; exit }' "$1"
+}
+
+root_token() {  # reads words on stdin
+	tr -s ' \t\n' '\n' | grep -m1 '^root=' || true
+}
+
+# <file> <label> <kernel> <fdt> -- the file with the label's kernel and fdt lines
+# replaced, everything else as it is.
+with_kernel() {
+	awk -v label="$2" -v kernel="$3" -v fdt="$4" '
+		$1 == "label" { in_label = ($2 == label) }
+		in_label && ($1 == "kernel" || $1 == "fdt") {
+			match($0, /^[ \t]*/)
+			print substr($0, 1, RLENGTH) $1 " " ($1 == "kernel" ? kernel : fdt)
+			next
+		}
+		{ print }' "$1"
+}
+
+# tmp replaces file; the content and the rename are on disk before this returns.
+replace() {  # <tmp> <file>
+	if ! { chmod "${FILE_MODE}" "$1" && sync "$1" && mv -f "$1" "$2" && sync "$(dirname "$2")"; }; then
+		die "cannot replace $2"
+	fi
+}
+
+set_kernel() {  # <file> <label> <kernel> <fdt>
+	with_kernel "$1" "$2" "$3" "$4" > "$1${NEW}" || die "cannot write $1${NEW}"
+	[ "$(label_line "$1${NEW}" "$2" kernel)" = "$3" ] && [ "$(label_line "$1${NEW}" "$2" fdt)" = "$4" ] \
+		&& [ "$(label_line "$1${NEW}" "$2" append)" = "$(label_line "$1" "$2" append)" ] \
+		&& [ "$(wc -l < "$1${NEW}")" = "$(wc -l < "$1")" ] \
+		|| die "the new $1 would not be what was meant -- left alone"
+	replace "$1${NEW}" "$1"
+}
+
+# --- facts about the system -----------------------------------------------------
+
+pkg_status() {  # <package>
+	dpkg-query -W -f '${db:Status-Status}' "$1" 2>/dev/null || true
+}
+
+has_wlan_driver() {  # <kernel release>
+	[ -n "$(find "${MODULES}/$1" -name "${WLAN_MODULE}" -print -quit 2>/dev/null)" ]
+}
+
+# Is the default entry the kernel that is running?
+default_is_running() {  # <default kernel path>
+	case "$1" in
+		/boot/vmlinuz-*) [ "${1#/boot/vmlinuz-}" = "$(uname -r)" ] ;;
+		/boot/Image)
+			[ -f "${ROOT}$1" ] && [ "$(sha256sum < "${ROOT}$1" | cut -d' ' -f1)" = "$(sed -n 's/^kernel_sha256=//p' "${BUILD_ID}" 2>/dev/null)" ]
+			;;
+		*) return 1 ;;
+	esac
+}
+
+# --- is this a kernel for us, on a system we may change -------------------------
+
+# Ours: a release name like 6.18.60-r2, and the maintainer of this package.
+own="$(dpkg-query -W -f '${Maintainer}' a7s-kernel-hook 2>/dev/null || true)"
+printf '%s\n' "${version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-[rt][0-9]+$' \
+	&& [ -n "${own}" ] && [ "$(dpkg-query -W -f '${Maintainer}' "linux-image-${version}" 2>/dev/null || true)" = "${own}" ] \
+	|| { say "${version}: not an a7s kernel, extlinux unchanged"; exit 0; }
+
+[ -d "${SYSTEMD_RUN}" ] || { say "${version}: systemd is not running (a chroot?), extlinux unchanged"; exit 0; }
+
+# From the headers package: only to finish what the image package's run left
+# waiting for these headers.
+if [ "${A7S_KERNEL_HOOK_HEADERS:-}" = 1 ]; then
+	[ "$(cat "${WAITING}" 2>/dev/null || true)" = "${version}" ] || exit 0
+	rm -f "${WAITING}"
+	[ "$(pkg_status "linux-image-${version}")" = installed ] || exit 0
+fi
+
+for f in "${EXTLINUX}" "${FALLBACK}"; do
+	head -n 1 "${f}" 2>/dev/null | grep -Eq '^# a7s-build[.:] ' \
+		|| skip "${f#"${ROOT}"} is missing or was not written by this image" \
+			"Nothing to do: this system does not use the boot entries the hook manages. To start ${version}, change ${EXTLINUX#"${ROOT}"} yourself."
+done
+default="$(default_label "${EXTLINUX}")"
+fallback="$(default_label "${FALLBACK}")"
+cur_kernel="$(label_line "${EXTLINUX}" "${default}" kernel)"
+cur_fdt="$(label_line "${EXTLINUX}" "${default}" fdt)"
+current="$(kernel_name "${cur_kernel}")"
+fb_kernel="$(label_line "${FALLBACK}" "${fallback}" kernel)"
+fb_fdt="$(label_line "${FALLBACK}" "${fallback}" fdt)"
+[ -n "${default}" ] && [ -n "${fallback}" ] && [ -n "${cur_kernel}" ] && [ -n "${cur_fdt}" ] && [ -n "${fb_kernel}" ] && [ -n "${fb_fdt}" ] \
+	|| skip "a boot entry of extlinux.conf or extlinux-fallback.conf has no kernel or fdt line" \
+		"To start ${version}, change /boot/extlinux/extlinux.conf yourself."
+
+booted_root="$(root_token < "${CMDLINE}")"
+[ -n "${booted_root}" ] && [ "${booted_root}" = "$(label_line "${EXTLINUX}" "${default}" append | root_token)" ] \
+	|| skip "this system runs from another disk than the one /boot/extlinux/extlinux.conf names" \
+		"Boot from the disk that holds this /boot, then run: ${redo}"
+[ -f "${IDENTITY_DONE}" ] \
+	|| skip "the first start of this system has not finished" \
+		"Restart the board once, then run: ${redo}"
+
+new_kernel="/boot/vmlinuz-${version}"
+new_fdt="/usr/lib/linux-image-${version}/${KERNEL_DTB}"
+recovery=0
+if tr -s ' \t\n' '\n' < "${CMDLINE}" | grep -Eq '^a7s\.fallback(=|$)'; then
+	if [ "${fb_kernel}" = "${new_kernel}" ] && [ "${fb_fdt}" = "${new_fdt}" ]; then
+		recovery=1
+	elif [ "${fb_kernel#/boot/vmlinuz-}" != "${fb_kernel}" ]; then
+		skip "the board is in safe mode, where only the kernel that started it can be chosen again" \
+			"To leave safe mode, run: sudo dpkg-reconfigure linux-image-${fb_kernel#/boot/vmlinuz-}"
+	else
+		skip "the board is in safe mode with the image's own kernel, which has no package" \
+			"Once the cause of the failed start is fixed, run: sudo busybox devmem ${BOOT_COUNTER} 32 0   and then: sudo reboot"
+	fi
+else
+	systemctl is-active --quiet boot-complete.target \
+		|| skip "this start of the system has not finished cleanly yet" \
+			"When it has (systemctl --failed shows what is wrong), run: ${redo}"
+fi
+
+[ -s "${ROOT}${new_kernel}" ] && [ -s "${ROOT}${new_fdt}" ] \
+	|| skip "its files are missing in /boot or /usr/lib/linux-image-${version}" \
+		"Install it again: ${install_again}"
+# Safe mode, the kernel of the safe-mode entry: the default is the running kernel again.
+# This also finishes a run that was cut short, or one that was done before.
+if [ "${recovery}" = 1 ]; then
+	if [ "${cur_kernel}" != "${new_kernel}" ] || [ "${cur_fdt}" != "${new_fdt}" ]; then
+		set_kernel "${EXTLINUX}" "${default}" "${new_kernel}" "${new_fdt}"
+	fi
+	if ! { rm -f "${PENDING}" && sync "${STATE_DIR}"; }; then die "cannot remove ${PENDING}"; fi
+	if [ -x "${BUSYBOX}" ] && "${BUSYBOX}" devmem "${BOOT_COUNTER}" 32 0; then
+		say "kernel ${version} is the one the next start uses, in normal mode."
+		say "Restart the board to use it."
+	else
+		say "kernel ${version} is the one the next start uses, but the board stays in safe mode until its boot counter is cleared."
+		say "Run: sudo /usr/bin/busybox devmem ${BOOT_COUNTER} 32 0   and restart the board."
+	fi
+	exit 0
+fi
+
+if [ "${cur_kernel}" = "${new_kernel}" ] && [ "${cur_fdt}" = "${new_fdt}" ]; then
+	say "kernel ${version} is the one the next start uses."
+	exit 0
+fi
+
+# The WLAN driver comes with DKMS, when the headers are set up.
+if has_wlan_driver "$(uname -r)" && ! has_wlan_driver "${version}"; then
+	if [ "${A7S_KERNEL_HOOK_HEADERS:-}" != 1 ]; then
+		case "$(pkg_status "linux-headers-${version}")" in
+			installed) ;;
+			unpacked|half-configured|half-installed)
+				if ! { printf '%s\n' "${version}" > "${WAITING}" && sync "${WAITING}"; }; then die "cannot write ${WAITING}"; fi
+				say "kernel ${version} is installed; it becomes the one the next start uses when linux-headers-${version} is set up without errors (the WLAN driver is built then)."
+				say "If that fails, the next start still uses ${current}; 'dkms status' shows the driver build."
+				exit 0 ;;
+			*) ;;
+		esac
+	fi
+	skip "it has no WLAN driver, which the running kernel has" \
+		"Install linux-headers-${version} so that DKMS builds the driver, check 'dkms status', then run: ${redo}"
+fi
+
+# --- the change -----------------------------------------------------------------
+
+if [ -f "${PENDING}" ] && [ "$(cat "${PENDING}")" != "$(uname -r)" ]; then
+	: # the previous install has not been started yet: the safe-mode entry stays
+else
+	default_is_running "${cur_kernel}" \
+		|| skip "the running kernel ($(uname -r)) is not the one this system started with" \
+			"Restart the board, then run: ${redo}"
+	set_kernel "${FALLBACK}" "${fallback}" "${cur_kernel}" "${cur_fdt}"
+fi
+set_kernel "${EXTLINUX}" "${default}" "${new_kernel}" "${new_fdt}"
+printf '%s\n' "${version}" > "${PENDING}${NEW}" || die "cannot write ${PENDING}${NEW}"
+replace "${PENDING}${NEW}" "${PENDING}"
+rm -f "${WAITING}"
+say "kernel ${version} is the one the next start uses."
+say "If it does not start, safe mode starts $(kernel_name "$(label_line "${FALLBACK}" "${fallback}" kernel)") after three tries."

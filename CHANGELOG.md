@@ -11,16 +11,30 @@ A tag is named `v<kernel version>-T<n>` for a test build or
 stable version the recipe builds, a letter and a counter that restarts at 1 with
 each new kernel version. Pushing such a tag builds it; the text of the draft
 release on GitHub is the section below with the same version (for a test tag it
-may be short). No schedule is promised for new releases.
+may be short).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `a7s-kernel-hook_<version>_all.deb`, a third package of the release: hooks
+  in `/usr/share/kernel` that make a newly installed kernel the default entry of
+  `/boot/extlinux/extlinux.conf` and the kernel that booted well the safe-mode
+  entry of `extlinux-fallback.conf`, and that refuse to remove a kernel that either
+  file boots, headers included. They change nothing for other kernels, in a chroot, in
+  safe mode (but for making the safe-mode kernel the default again), before the
+  boot has been confirmed as successful, or when the new kernel would have no WLAN
+  driver (DKMS did not build it). See `docs/kernel.md`.
+- `sudo a7s-kernel-update` (in the same package): installs the newest release,
+  or the one named (`v6.18.60-R2`, or a published test build `v6.18.60-T1`), after
+  checking the sha256 of the download. Run it when you want to update.
+- Step `hook` (`./build.sh hook`), which builds that package without a kernel
+  build; step `deb` runs it too.
 
 ## [6.18.59-R1] - 2026-10-29
 
 First release: the same recipe as the test build 6.18.59-T4; the sections
-below list what it contains. No further releases or updates are promised.
+below list what it contains.
 
 ## [6.18.59-T4] - 2026-10-29
 

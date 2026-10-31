@@ -59,7 +59,8 @@ its own builder.
 | `compile-check` | configure and compile only the A733 driver directories (fast) |
 | `build` | configure, build `Image`, the dtb, the modules and the driver, write `KERNEL-ID` |
 | `all` | `fetch`, `apply-patches`, `build` |
-| `deb` | after `build`, with `A7S_KERNEL_REVISION=r<n>` (or `t<n>`): `linux-image` and `linux-headers` as Debian packages in `out/deb/` |
+| `deb` | after `build`, with `A7S_KERNEL_REVISION=r<n>` (or `t<n>`): `linux-image` and `linux-headers` as Debian packages in `out/deb/`, and `a7s-kernel-hook` (step `hook`) |
+| `hook` | with `A7S_KERNEL_REVISION`, no kernel build needed: `a7s-kernel-hook_<version>_all.deb` in `out/deb/` |
 | `package` | after `build` and `deb`: the release files in `out/release/` (see [Releases](#releases)) |
 | `key` | print the identity of this checkout: `<version>-<tarball sha256 12>-<hash 12>`; the hash covers `scripts/`, `kernel/`, `pins/`, `out-of-tree/`, `container/packages.txt` and the build time |
 
@@ -79,8 +80,7 @@ A release is named `v<kernel version>-R<n>` (`v6.18.59-R1`); a test build is
 GitHub-hosted x86_64 runner. The text of a release is its section in
 [CHANGELOG.md](CHANGELOG.md) (required for every tag). Both create a draft
 release that the maintainer publishes by hand; a test tag's draft is marked as
-a pre-release. Builds are made when the maintainer tags one; no schedule is
-promised. A pull request is only checked for applying the series and compiling
+a pre-release. Builds are made when the maintainer tags one. A pull request is only checked for applying the series and compiling
 the A733 directories ([compile-check.yml](.github/workflows/compile-check.yml)).
 
 The tag gives the kernel a revision: `v6.18.59-R1` builds the kernel release
@@ -93,6 +93,7 @@ Attached to a release:
 |---|---|
 | `linux-image-<release>_<version>_arm64.deb` | `/boot/vmlinuz-<release>` (the raw `Image`), `config-`, `System.map-`, the modules in `/lib/modules/<release>`, the device trees in `/usr/lib/linux-image-<release>/allwinner/` |
 | `linux-headers-<release>_<version>_arm64.deb` | `/usr/src/linux-headers-<release>` with `Module.symvers` and the scripts built for arm64, `/lib/modules/<release>/build` pointing to it; for DKMS and `make -C /lib/modules/<release>/build M=...` on the board |
+| `a7s-kernel-hook_<version>_all.deb` | `/usr/sbin/a7s-kernel-update` (downloads and installs a release) and hooks in `/usr/share/kernel` (with wrappers for the headers package in `/etc/kernel`): after an install they make the new kernel the default entry of `/boot/extlinux/extlinux.conf` and the kernel that booted well the safe-mode entry, not if the WLAN driver would be lost; they refuse to remove either (see [docs/kernel.md](docs/kernel.md)). Its version is the one of the kernel packages |
 | `Image`, `sun60i-a733-cubie-a7s.dtb`, `config`, `System.map` | as `./build.sh` leaves them in `out/` |
 | `a7s-linux-lts-<release>-modules.tar.xz` | the kernel's modules, `lib/modules/<release>/`, `depmod` run over the set |
 | `KERNEL-ID` | the build identity, with the sha256 of the four files above, and the line `release_modules=without_aic8800` |
@@ -101,13 +102,13 @@ Attached to a release:
 
 The WLAN/BT driver is not part of the releases (the image recipe builds it).
 The packages are named for the release, so a newer one installs beside an older
-one and the older kernel stays bootable; `apt install ./linux-image-<release>_*.deb
-./linux-headers-<release>_*.deb` installs a pair, and the boot menu entry is the
-job of the tool that manages `/boot/extlinux` (u-boot-menu finds the device tree
-under `/usr/lib/linux-image-<release>/` and takes `allwinner/<dtb>` from its
-`U_BOOT_FDT` setting). Versions: `R<n>` is `<kernel version>-<n>`, `T<n>` is
-`<kernel version>~t<n>-1`, which sorts before the release of the same kernel
-version. Nothing here promises further releases.
+one and the older kernel stays bootable. On a board, `sudo a7s-kernel-update` downloads and installs the newest release
+(or the one named, `v6.18.60-R2`), and the hook makes the new kernel the next
+boot ([docs/kernel.md](docs/kernel.md), "Installing a kernel on the
+board"); without the hook, the packages write no boot entry. Versions: `R<n>`
+is `<kernel version>-<n>`, `T<n>` is `<kernel version>~t<n>-1` (in file names the `~` is a `.`), which sorts before the release of the same kernel
+version. New kernels come as releases; `sudo a7s-kernel-update` installs the
+newest.
 
 The kernel tarball and the source archive of the tag, which GitHub adds to every
 release (patches, config, scripts), are the corresponding source of the kernel

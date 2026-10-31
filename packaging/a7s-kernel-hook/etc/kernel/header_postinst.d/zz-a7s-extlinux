@@ -1,0 +1,12 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# zz-a7s-extlinux -- run by the headers package's postinst, after the DKMS hook
+# of this directory (names sort), with the kernel version as the argument. The
+# headers package knows /etc/kernel only; the hook itself is in /usr/share/kernel
+# and goes with the package a7s-kernel-hook. The WLAN driver is built here, so a
+# kernel whose image was set up before its headers gets its entry now.
+hook="${A7S_ROOT_DIR:-}/usr/share/kernel/postinst.d/zz-a7s-extlinux"
+[ -x "${hook}" ] || exit 0
+exec env A7S_KERNEL_HOOK_HEADERS=1 "${hook}" "$@"

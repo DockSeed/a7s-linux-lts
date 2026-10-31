@@ -30,6 +30,170 @@ authorship and trailers and name their source (`[ Upstream commit <sha> ]` or
 `Link:`); if we changed one, it also says `[ adapted: … ]`. Code ported from
 Allwinner's BSP says so in its header.
 
+## Installing a kernel on the board
+
+New kernels come as releases of this recipe; `sudo a7s-kernel-update` installs
+the newest. There is no guarantee for how long new releases will be published.
+The command is part of the package `a7s-kernel-hook`, which the images of
+a7s-build carry.
+
+1. `sudo a7s-kernel-update` installs the latest release (GitHub's "latest"
+   leaves out drafts and pre-releases); `sudo a7s-kernel-update v6.18.60-R2`
+   installs that release; a published test build is named the same way
+   (`v6.18.60-T1`, a pre-release, with a note that it is one). It downloads the three packages
+   of the release to a temporary directory below `/var/cache/a7s-kernel-update`,
+   checks their sha256 against the release's `SHA256SUMS` (a mismatch removes
+   the files and stops), installs them with `apt-get` and removes the directory.
+   The `a7s-kernel-hook` package is installed only if the release has a newer one
+   than the installed, in an `apt-get` call of its own before the kernel packages. It ends with one line: either that the new kernel starts
+   at the next boot, or that it does not, after the messages of the hook that say
+   why. `sudo a7s-kernel-update --help` lists the steps. If the newest kernel is
+   installed and set to start, it says so and does nothing. In safe mode it
+   installs nothing and names the way back (below), because a new kernel would
+   not start there.
+2. `sudo reboot`. The new kernel starts; the old one stays installed.
+3. `uname -r` shows the release that runs.
+
+The sha256 check is of the download, not of who made the release; there is no
+apt source for the kernel packages.
+
+If `a7s-kernel-update` stops with "the installation failed" (for example because
+DKMS cannot build the WLAN driver), the boot entries are unchanged and the next
+start uses the old kernel. To undo what was installed:
+`sudo apt remove linux-image-<release> linux-headers-<release>`, and look at
+`dkms status`. The downloaded packages stay in the directory the message names.
+
+If the new kernel does not start, U-Boot starts safe mode after three tries,
+with the kernel that worked before (no desktop, no WLAN; Ethernet, SSH and the
+serial console work). To go back to it:
+
+1. `sudo dpkg-reconfigure linux-image-$(uname -r)`: in safe mode `uname -r` is
+   the old kernel. This sets it to start normally and clears the boot counter.
+2. `sudo reboot`. The old kernel starts normally.
+3. To remove the failed kernel: `sudo apt remove linux-image-<failed release>
+   linux-headers-<failed release>` (`dpkg -l 'linux-image-*'` lists the names).
+   Neither boot entry names it any more, so this is allowed. An older kernel that
+   was fine can be removed once two newer ones have been installed and started.
+
+If the new kernel starts but you want the old one back, run
+`sudo dpkg-reconfigure linux-image-<old release>` and `sudo reboot`. The old
+kernel becomes the one that starts, and the kernel that runs now becomes the
+safe-mode kernel.
+
+The same without `a7s-kernel-update`, for a first install or a board without
+the command:
+
+1. Download `linux-image-<release>_<version>_arm64.deb`,
+   `linux-headers-<release>_<version>_arm64.deb`,
+   `a7s-kernel-hook_<version>_all.deb` and `SHA256SUMS` from the release page.
+2. `sha256sum -c --ignore-missing SHA256SUMS` (a test build's file names have a `.` where the package version has a `~`: `…_6.18.59.t4-1_…`)
+3. Install the hook package first so that it is active when the kernel is
+   installed: `sudo apt install ./a7s-kernel-hook_*.deb`, then `sudo apt install ./linux-image-<release>_*.deb ./linux-headers-<release>_*.deb`
+4. Where the AIC8800 driver comes from DKMS (the images of a7s-build), check
+   `dkms status`: the driver must be built for the new kernel.
+5. `sudo reboot`
+
+When the hook does not switch to the new kernel, it says why and which command
+to run; the kernel is installed in any case. Each message is two lines. After
+the cause is gone, `sudo dpkg-reconfigure linux-image-<release>` runs the check
+again.
+
+### What the hook does
+
+This is reference; the steps above are all a user needs.
+
+The kernel package puts the kernel and the device tree in `/boot` and
+`/usr/lib/linux-image-<release>/`, but writes no boot entry: `a7s-kernel-hook`
+does, for the two files that the image recipe writes, `/boot/extlinux/extlinux.conf`
+(the normal start) and `extlinux-fallback.conf` (safe mode, which U-Boot starts
+after three failed tries).
+
+- **`/usr/share/kernel/postinst.d/zz-a7s-extlinux`** runs when a kernel package
+  is installed, configured again (`dpkg-reconfigure`) or upgraded; the kernel
+  package runs `/usr/share/kernel` and `/etc/kernel` together, sorted by name, so
+  after DKMS. The new kernel and its device tree become the default entry. The
+  kernel lines the default entry had, which is the kernel that started well, move
+  to the safe-mode entry. If the previous install was not started yet
+  (`/var/lib/a7s/kernel-pending` names it and it is not the running kernel), the
+  default is replaced and the safe-mode entry stays. The `append` lines are
+  never changed. Each file is written beside the old one, flushed and renamed,
+  the safe-mode file first. After a power failure Linux sees each file either old
+  or new once it has replayed the ext4 journal; U-Boot does not replay the
+  journal when it reads the file, so it reads what the disk holds before that.
+- **`/etc/kernel/header_postinst.d/zz-a7s-extlinux`** is a wrapper for the headers
+  package, which knows `/etc/kernel` only. DKMS builds the WLAN driver there (its
+  hook sorts before this one), and `apt` sets up the image package and the
+  headers package in either order. If the image package comes first, its run
+  notes the version in `/var/lib/a7s/kernel-waiting` and waits; the wrapper then
+  makes the entry, only for that version. Any other run, such as a reinstall of
+  old headers, does nothing.
+- **`/usr/share/kernel/prerm.d/a7s-extlinux`** refuses to remove a kernel that
+  either file starts (the default entry or the safe-mode entry); `apt` and
+  `dpkg` stop with a message. **`/etc/kernel/header_prerm.d/a7s-extlinux`** does
+  the same for the headers of that kernel (the headers package runs its hooks
+  with `--exit-on-error`, so `apt remove linux-image-X linux-headers-X` removes
+  neither). A kernel that neither file names can be removed, which is the case
+  for the older ones after two more kernels were installed. When a removal is
+  refused, the other hooks of `prerm.d` run anyway, DKMS's among them, and
+  `dpkg` undoes the removal; DKMS builds the driver again at that step. Check
+  `dkms status` after a refused removal.
+- The two wrappers in `/etc` are conffiles (`dpkg` asks before replacing one you
+  changed). The hooks in `/usr/share/kernel` go with the package; after `apt
+  remove a7s-kernel-hook` the wrappers find no hook and do nothing.
+
+The hook changes nothing, says why, and does not fail the install when:
+
+- the kernel is not one of ours: the release name is not
+  `<x>.<y>.<z>-r<n>` or `-t<n>`, or the package's maintainer is not
+  `DockSeed <dockseed@proton.me>` (a Debian kernel never becomes the default);
+- no systemd is running (a chroot; the image recipe writes the files itself);
+- the two files do not start with the image recipe's header, or the kernel image
+  or device tree is missing;
+- `/boot` is not certainly the one the board started from: `root=` on the running
+  kernel's command line is not the one of the default entry, or
+  `/var/lib/a7s/root-identity.done` is missing (the first-start disk identity is
+  not done);
+- the default entry is not the running kernel: `/boot/vmlinuz-<release>` with
+  another release than `uname -r`, or `/boot/Image` with another checksum than
+  `kernel_sha256=` in `/boot/BUILD-ID`; then `/boot` is not shown to be the one
+  that started, and the safe-mode entry must not be taken from it;
+- the running kernel has the WLAN driver (`aic8800_fdrv.ko` under
+  `/usr/lib/modules/<release>`) and the new one has not, because DKMS did not
+  build it (or the headers are not installed): the board would lose WLAN and
+  Bluetooth. This holds for an image built with `A7S_KERNEL=build`, whose driver
+  is part of its own kernel and which has no DKMS: no kernel package becomes the
+  default there;
+- the running system is in safe mode (`a7s.fallback`), except for the one case
+  below, or its `boot-complete.target` is not active: this start has not been
+  confirmed as successful, so it must not become the safe-mode entry.
+
+The one change in safe mode: when the kernel of the safe-mode entry is configured
+again (`dpkg-reconfigure`, or its `.deb` installed again), it becomes the default
+again. The safe-mode entry stays and the pending file goes, since the default is
+the kernel that is running. The hook then clears the boot counter the way
+`a7s-boot-good.service` of the image does (`/usr/bin/busybox devmem`, RTC
+`GP_DATA_REG7`), so that the next start is a normal one. Without `busybox` it
+prints the command and does not fail.
+
+## Publishing a release
+
+For the maintainer; the steps are those of [release.yml](../.github/workflows/release.yml).
+
+1. Make sure `KERNEL_VERSION` in `scripts/lib/kernel.sh` is the kernel version
+   to release, and rename the `[Unreleased]` section of `CHANGELOG.md` to
+   `## [<kernel version>-R<n>] - <date>`. The workflow stops before the build
+   when the tag does not name that version or the section is missing.
+2. `git tag v<kernel version>-R<n>` on that commit, `git push origin` the tag
+   (a `-T<n>` tag makes a test build, a pre-release).
+3. The workflow builds the tag (`./build.sh all`, `deb`, `package`) and creates
+   a draft release: three packages, the loose files, `SHA256SUMS`, the changelog
+   section as text.
+4. Read the draft (files, `KERNEL-ID`, text), then publish it by hand. Only a
+   published `-R<n>` release is what `sudo a7s-kernel-update` installs.
+5. In a7s-build, move the pins together: `KERNEL_RELEASE_TAG`, `_COMMIT`, `_NAME`,
+   the three package names and their sha256 (from the release's `SHA256SUMS`)
+   in `scripts/stages/kernel.sh`, and `KERNEL_RECIPE_COMMIT` to the same commit.
+
 ## Good to know
 
 - **MAC address.** The kernel carries none. U-Boot writes `local-mac-address`

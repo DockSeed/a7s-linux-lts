@@ -88,7 +88,7 @@ jobs:
       - name: Build
         run: ./build.sh all
 
-      - name: Make the Debian packages
+      - name: Make the Debian packages (kernel, headers, extlinux hook)
         run: ./build.sh deb
 
       - name: Make the release files
@@ -150,6 +150,7 @@ jobs:
           Built by GitHub Actions from commit `@COMMIT@` with `./build.sh`. `KERNEL-ID` has the build identity, `SHA256SUMS` the checksums of every file.
 
           - `linux-image-*.deb` and `linux-headers-*.deb`: the kernel with its modules and device trees, and the build environment for modules (DKMS). They are named for the release, so they install beside an older kernel.
+          - `a7s-kernel-hook_*_all.deb`: hooks that make a newly installed kernel the next boot in `/boot/extlinux/extlinux.conf` and keep the kernel that booted well as the safe-mode entry. Install the newest release on a board with `sudo a7s-kernel-update`; the steps, the way back and the manual way are in the "Updates" section of the README of [a7s-build](https://github.com/DockSeed/a7s-build). The WLAN/BT driver is not in these packages: it comes from DKMS when the headers are set up, and a kernel without it is not made the next boot. The sha256 of every file is in `SHA256SUMS`.
           - `Image`, the device tree blob, `config` and `System.map`: as `./build.sh` leaves them in `out/`.
           - `a7s-linux-lts-*-modules.tar.xz`: the kernel modules (`lib/modules/<release>/`), `depmod` run over the set.
 

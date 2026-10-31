@@ -19,7 +19,10 @@
 #   all             fetch + apply-patches + build
 #   key             print the identity of this checkout's kernel (cache key)
 #   deb             after build: the kernel as Debian packages (linux-image,
-#                   linux-headers) in OUT_DIR/deb; needs A7S_KERNEL_REVISION
+#                   linux-headers) and a7s-kernel-hook in OUT_DIR/deb; needs
+#                   A7S_KERNEL_REVISION
+#   hook            the a7s-kernel-hook package (extlinux entries for installed
+#                   kernels) in OUT_DIR/deb; needs A7S_KERNEL_REVISION, no build
 #   package         after build and deb: the release files in OUT_DIR/release
 #                   (loose files, modules, the two packages, SHA256SUMS)
 #
@@ -54,6 +57,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${ROOT_DIR}/scripts/lib/aic8800.sh"
 # shellcheck source=lib/deb.sh
 . "${ROOT_DIR}/scripts/lib/deb.sh"
+# shellcheck source=lib/hook.sh
+. "${ROOT_DIR}/scripts/lib/hook.sh"
 # shellcheck source=lib/release.sh
 . "${ROOT_DIR}/scripts/lib/release.sh"
 
@@ -101,6 +106,7 @@ main() {
     build)         env_setup; stage_build ;;
     all)           env_setup; stage_all ;;
     deb)           env_setup; stage_deb ;;
+    hook)          env_setup; stage_hook ;;
     package)       env_setup; stage_package ;;
     -h|--help|help) usage 1 0 ;;
     *)             usage ;;

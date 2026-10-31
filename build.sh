@@ -8,7 +8,7 @@
 # The steps themselves are scripts/build.sh, which runs inside the container.
 #
 #   ./build.sh [<step>]           pins | fetch | apply-patches | compile-check |
-#                                 build | deb | package | all (default) | key
+#                                 build | deb | hook | package | all (default) | key
 #   ./build.sh shell [<cmd>...]   a shell (or one command) in the builder
 #   ./build.sh --help
 #
@@ -30,7 +30,7 @@ Usage:
                                    interactive shell (or one command) in the builder
   ./build.sh --help                this text
 
-Steps (scripts/build.sh): pins, fetch, apply-patches, compile-check, build, deb, package,
+Steps (scripts/build.sh): pins, fetch, apply-patches, compile-check, build, deb, hook, package,
 all, key.
 
 Environment (read by this script only):

@@ -1,0 +1,173 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# a7s-kernel-update -- install the newest published release of the kernel
+# (a7s-linux-lts) on this board, or the one named on the command line:
+#
+#   sudo a7s-kernel-update              the latest release (GitHub leaves drafts
+#                                       and pre-releases out of "latest")
+#   sudo a7s-kernel-update v6.18.60-R2  this release
+#   sudo a7s-kernel-update v6.18.60-T1  a published test build (pre-release)
+#
+# It downloads SHA256SUMS of the release, takes the names of the three packages
+# (linux-image, linux-headers, a7s-kernel-hook) from it, downloads them to a new
+# directory below /var/cache/a7s-kernel-update, checks their sha256 (a mismatch
+# removes everything and stops) and installs them with apt-get; a7s-kernel-hook
+# only if the release has a newer one than the installed (a test build's
+# 6.18.60~t1 is older than the release 6.18.60-1), and in a call of its
+# own before the kernel packages, so that its files are configured (a board
+# without the package has only unconfigured copies of the wrappers in /etc) and
+# stay installed if the kernel packages fail. The hooks of that
+# package make the kernel the next boot; this script reads the result from
+# extlinux.conf and says whether it did. The directory is removed after the
+# installation, and kept, with its path in the message, when that fails. It runs
+# once, when called: no timer, no service. The sha256 check covers the download,
+# not who made the release.
+#
+# A7S_ROOT_DIR names a tree to work on instead of / (for tests).
+set -eu
+
+ROOT="${A7S_ROOT_DIR:-}"
+CACHE="${ROOT}/var/cache/a7s-kernel-update"
+EXTLINUX="${ROOT}/boot/extlinux/extlinux.conf"
+CMDLINE="${ROOT}/proc/cmdline"
+RELEASES_URL="https://github.com/DockSeed/a7s-linux-lts/releases"
+# curl: https only, also after redirects; no overall time limit (a package is
+# large), but a connection that gives less than 10 KiB/s for a minute is dropped.
+CURL_OPTIONS="--proto =https --proto-redir =https --retry 3 --connect-timeout 30 --speed-limit 10240 --speed-time 60"
+APT_LOCK_WAIT=300
+
+say() { printf 'a7s-kernel-update: %s\n' "$*"; }
+die() { printf 'a7s-kernel-update: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+	cat <<'USAGE'
+a7s-kernel-update -- install the newest kernel release of a7s-linux-lts
+
+  sudo a7s-kernel-update              the latest release
+  sudo a7s-kernel-update v6.18.60-R2  this release
+  sudo a7s-kernel-update v6.18.60-T1  a test build (a published pre-release)
+
+1. It downloads the three packages of the release and checks their sha256.
+2. It installs them; a7s-kernel-hook makes the new kernel the next boot.
+3. It says whether the new kernel starts at the next boot: then run
+   sudo reboot
+4. Check what runs: uname -r.
+5. If the new kernel does not start, the board comes up in safe mode after three
+   tries (no desktop, no WLAN; Ethernet, SSH and the console work). There run:
+   sudo dpkg-reconfigure linux-image-$(uname -r)
+   and sudo reboot.
+USAGE
+}
+
+# The kernel the default entry of extlinux.conf starts.
+default_kernel() {
+	awk '$1 == "default" { d = $2 } $1 == "label" { in_default = ($2 == d) }
+		in_default && $1 == "kernel" { print $2; exit }' "${EXTLINUX}" 2>/dev/null
+}
+
+fetch() {  # <url> <file>
+	# shellcheck disable=SC2086
+	curl -fsSL ${CURL_OPTIONS} -o "$2" "$1" || die "cannot download $1; nothing was changed"
+}
+
+# The one file of SHA256SUMS whose name matches the pattern.
+pick() {  # <awk pattern>
+	name="$(awk -v re="$1" '$2 ~ re { print $2 }' "${work}/SHA256SUMS")"
+	[ -n "${name}" ] && [ "$(printf '%s\n' "${name}" | wc -l)" = 1 ] \
+		|| die "this release does not have exactly one file like $1 (an a7s kernel release with the hook package?); nothing was changed"
+	printf '%s' "${name}"
+}
+
+installed_version() {  # <package>
+	dpkg-query -W -f '${Version}' "$1" 2>/dev/null || true
+}
+
+case "${1:-}" in -h|--help) usage; exit 0 ;; esac
+[ "$(id -u)" = 0 ] || die "run it as root: sudo a7s-kernel-update"
+[ "$#" -le 1 ] || die "usage: sudo a7s-kernel-update [v<kernel version>-R<n>]"
+tag="${1:-}"
+if [ -z "${tag}" ]; then
+	base="${RELEASES_URL}/latest/download"
+elif printf '%s\n' "${tag}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[RT][0-9]+$'; then
+	base="${RELEASES_URL}/download/${tag}"
+else
+	die "'${tag}' is not a release tag; use one like v6.18.60-R2 (or -T1 for a test build), or none for the latest release"
+fi
+case "${tag}" in *-T*) say "${tag} is a test build, not a release." ;; esac
+
+# In safe mode a new kernel would not be started: the hooks only let the kernel
+# that started safe mode become the default again.
+if tr -s ' \t\n' '\n' < "${CMDLINE}" 2>/dev/null | grep -Eq '^a7s\.fallback(=|$)'; then
+	if [ -n "$(installed_version "linux-image-$(uname -r)")" ]; then
+		die "the board is in safe mode, so a new kernel would not start. To leave it, run: sudo dpkg-reconfigure linux-image-$(uname -r)   and then: sudo reboot"
+	fi
+	die "the board is in safe mode with the image's own kernel, so a new kernel would not start. Once the cause of the failed start is fixed, run: sudo busybox devmem 0x0709011C 32 0   and then: sudo reboot"
+fi
+
+mkdir -p "${CACHE}"
+chmod 0755 "${CACHE}"
+work="$(mktemp -d "${CACHE}/.download.XXXXXX")"
+keep=0
+trap '[ "${keep}" = 1 ] || rm -rf "${work}"' EXIT
+trap 'exit 1' INT TERM HUP
+chmod 0755 "${work}"
+
+fetch "${base}/SHA256SUMS" "${work}/SHA256SUMS"
+# (the files of a release are named without "~": a test build's 6.18.59~t4-1 is 6.18.59.t4-1)
+image="$(pick '^linux-image-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$')"
+headers="$(pick '^linux-headers-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$')"
+hook="$(pick '^a7s-kernel-hook_[0-9A-Za-z.+-]+_all\.deb$')"
+rel="${image#linux-image-}"
+rel="${rel%%_*}"
+
+image_installed="$(installed_version "linux-image-${rel}")"
+if [ -n "${image_installed}" ] && [ "$(default_kernel)" = "/boot/vmlinuz-${rel}" ]; then
+	say "already up to date: kernel ${rel} is installed and starts at the next boot."
+	exit 0
+fi
+
+say "downloading kernel ${rel}"
+for f in ${image} ${headers} ${hook}; do
+	fetch "${base}/${f}" "${work}/${f}"
+	awk -v f="${f}" '$2 == f' "${work}/SHA256SUMS" >> "${work}/SUMS"
+done
+( cd "${work}" && sha256sum -c --quiet SUMS ) \
+	|| die "the checksum of a download does not match SHA256SUMS; the files are removed, nothing was changed"
+chmod 0644 "${work}"/*
+
+# The hook package only when the release has a newer one than the installed.
+hook_file=""
+hook_new="$(dpkg-deb -f "${work}/${hook}" Version)" || die "cannot read ${hook}; nothing was changed"
+hook_installed="$(installed_version a7s-kernel-hook)"
+if [ -z "${hook_installed}" ] || dpkg --compare-versions "${hook_new}" gt "${hook_installed}"; then
+	hook_file="${hook}"
+else
+	say "a7s-kernel-hook ${hook_installed} is installed and not older than the release's ${hook_new}: kept"
+fi
+
+apt_install() {  # <option> <file>...
+	opt="$1"; shift
+	set -- -o "DPkg::Lock::Timeout=${APT_LOCK_WAIT}" install -y ${opt:+"${opt}"} "$@"
+	apt-get "$@"
+}
+
+# The hook package first, in a call of its own.
+if [ -n "${hook_file}" ] && ! apt_install "" "${work}/${hook_file}"; then
+	keep=1
+	die "installing ${hook_file} failed; nothing else was changed, the next start still uses $(default_kernel | sed 's#^/boot/vmlinuz-##'). The downloaded packages are in ${work}."
+fi
+reinstall=""
+[ -z "${image_installed}" ] || reinstall="--reinstall"
+if ! apt_install "${reinstall}" "${work}/${image}" "${work}/${headers}"; then
+	keep=1
+	current="$(default_kernel)"
+	die "the installation failed. The boot entries are unchanged: the next start still uses ${current#/boot/vmlinuz-}. To undo a half-done install: sudo apt remove linux-image-${rel} linux-headers-${rel}   and look at: dkms status. The package a7s-kernel-hook stays installed. The downloaded packages are in ${work}."
+fi
+
+if [ "$(default_kernel)" = "/boot/vmlinuz-${rel}" ]; then
+	say "kernel ${rel} starts at the next boot. Next: sudo reboot"
+else
+	die "kernel ${rel} is installed but will NOT start at the next boot; the messages of a7s-kernel-hook above say why and what to do"
+fi

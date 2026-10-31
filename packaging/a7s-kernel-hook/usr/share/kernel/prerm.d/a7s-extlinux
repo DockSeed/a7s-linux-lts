@@ -1,0 +1,45 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only OR MIT
+# SPDX-FileCopyrightText: the a7s-linux-lts contributors
+#
+# a7s-extlinux -- refuse to remove a kernel that extlinux.conf (the default) or
+# extlinux-fallback.conf (safe mode) starts: the board would not start, or not
+# start in safe mode. Run by the kernel package's prerm (run-parts) as
+# <version> <image path>, and by the headers package through the wrapper in
+# /etc/kernel/header_prerm.d (<version>, A7S_KERNEL_HOOK_HEADERS=1) for the
+# headers of such a kernel. A failing hook makes dpkg stop the removal. Only a
+# removal is refused, not an upgrade of the package.
+#
+# A7S_ROOT_DIR names a tree to work on instead of / (for tests).
+set -eu
+
+ROOT="${A7S_ROOT_DIR:-}"
+EXTLINUX="${ROOT}/boot/extlinux/extlinux.conf"
+FALLBACK="${ROOT}/boot/extlinux/extlinux-fallback.conf"
+
+version="${1:-}"
+# DEB_MAINT_PARAMS is set by the package's prerm: "remove", "upgrade <new version>", ...
+# shellcheck disable=SC2086
+set -- ${DEB_MAINT_PARAMS:-remove}
+[ "${1:-}" = remove ] || exit 0
+[ -n "${version}" ] || exit 0
+
+named_by() {  # <file> -- does the file boot this kernel or use its device tree?
+	[ -f "$1" ] || return 1
+	awk -v v="${version}" '
+		($1 == "kernel" && $2 == "/boot/vmlinuz-" v) ||
+		($1 == "fdt" && index($2, "/usr/lib/linux-image-" v "/") == 1) { found = 1 }
+		END { exit !found }' "$1"
+}
+
+refuse() {  # <entry> <what to do first>
+	pkg=linux-image
+	[ "${A7S_KERNEL_HOOK_HEADERS:-}" != 1 ] || pkg=linux-headers
+	printf 'a7s-kernel-hook: %s-%s is not removed: the board starts it %s.\n' "${pkg}" "${version}" "$1" >&2
+	printf 'a7s-kernel-hook: %s\n' "$2" >&2
+	exit 1
+}
+
+! named_by "${EXTLINUX}" || refuse "normally" "Install a newer kernel with sudo a7s-kernel-update and restart; after a start that failed, run sudo dpkg-reconfigure linux-image-\$(uname -r) in safe mode instead. Then it can be removed."
+! named_by "${FALLBACK}" || refuse "in safe mode" "Install a newer kernel with sudo a7s-kernel-update once the running one has started well; the safe-mode entry then moves on and this one can be removed."
+exit 0
