@@ -17,6 +17,36 @@ may be short).
 
 Nothing yet.
 
+## [6.18.59-R2] - 2026-10-31
+
+The same kernel as 6.18.59-R1, plus the kernel update path first published
+in 6.18.59-T5 and two clearer messages.
+
+### Added
+
+- `a7s-kernel-hook_<version>_all.deb`, a third package of the release: hooks
+  in `/usr/share/kernel` that make a newly installed kernel the default entry of
+  `/boot/extlinux/extlinux.conf` and the kernel that booted well the safe-mode
+  entry of `extlinux-fallback.conf`, and that refuse to remove a kernel that either
+  file boots, headers included. They change nothing for other kernels, in a chroot, in
+  safe mode (but for making the safe-mode kernel the default again), before the
+  boot has been confirmed as successful, or when the new kernel would have no WLAN
+  driver (DKMS did not build it). See `docs/kernel.md`.
+- `sudo a7s-kernel-update` (in the same package): installs the newest release,
+  or the one named (`v6.18.60-R2`, or a published test build `v6.18.60-T1`), after
+  checking the sha256 of the download. Run it when you want to update.
+- Step `hook` (`./build.sh hook`), which builds that package without a kernel
+  build; step `deb` runs it too.
+
+### Fixed
+
+- `a7s-kernel-update` names the missing package in a plain message instead of
+  a search pattern when a release has no hook package (releases before
+  `v6.18.59-R2`), and suggests running it without a tag when one was given.
+- The kernel hook no longer says "another disk" on the first start after
+  flashing, when the boot entries already name the disk the system runs from;
+  it asks you to restart once and then run `dpkg-reconfigure`.
+
 ## [6.18.59-T5] - 2026-10-31
 
 Test build.
