@@ -15,6 +15,12 @@ may be short).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [6.18.59-T5] - 2026-10-31
+
+Test build.
+
 ### Added
 
 - `a7s-kernel-hook_<version>_all.deb`, a third package of the release: hooks
