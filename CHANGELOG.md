@@ -15,10 +15,19 @@ may be short).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [6.18.60-R1] - 2026-11-01
+
+The recipe of 6.18.59-R2 on the next longterm release of Linux. Configuration,
+patch series and the packages are the same; `sudo a7s-kernel-update` on a board
+with 6.18.59-R2 installs this release.
+
 ### Changed
 
-- Linux 6.18.60 (longterm) as the base, up from 6.18.59. The series applies
-  unchanged at fuzz 0 without offsets.
+- Linux 6.18.60 (longterm) as the base, up from 6.18.59, with the fixes of that
+  stable release ([ChangeLog-6.18.60](https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.60)).
+  The series applies unchanged at fuzz 0 without offsets.
 
 ## [6.18.59-R2] - 2026-10-31
 
