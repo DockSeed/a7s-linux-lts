@@ -83,6 +83,10 @@ release that the maintainer publishes by hand; a test tag's draft is marked as
 a pre-release. Builds are made when the maintainer tags one. A pull request is only checked for applying the series and compiling
 the A733 directories ([compile-check.yml](.github/workflows/compile-check.yml)).
 
+Releases follow Linux stable 6.18 when we get to it; there is no schedule and
+no guarantee that a given fix, security fixes included, is released, or how
+soon.
+
 The tag gives the kernel a revision: `v6.18.60-R1` builds the kernel release
 `6.18.60-r1` (`A7S_KERNEL_REVISION=r1`), `v6.18.60-T1` builds `6.18.60-t1`.
 Local builds without a revision are the same kernel, named `6.18.60`.
