@@ -73,8 +73,8 @@ as a variant.
 
 ## Releases
 
-A release is named `v<kernel version>-R<n>` (`v6.18.59-R1`); a test build is
-`v<kernel version>-T<n>` (`v6.18.59-T1`). Both are built by GitHub Actions
+A release is named `v<kernel version>-R<n>` (`v6.18.60-R1`); a test build is
+`v<kernel version>-T<n>` (`v6.18.60-T1`). Both are built by GitHub Actions
 ([release.yml](.github/workflows/release.yml)) from the tagged commit with
 `./build.sh all`, `deb` and `package`, in the same pinned builder container, on a
 GitHub-hosted x86_64 runner. The text of a release is its section in
@@ -83,9 +83,9 @@ release that the maintainer publishes by hand; a test tag's draft is marked as
 a pre-release. Builds are made when the maintainer tags one. A pull request is only checked for applying the series and compiling
 the A733 directories ([compile-check.yml](.github/workflows/compile-check.yml)).
 
-The tag gives the kernel a revision: `v6.18.59-R1` builds the kernel release
-`6.18.59-r1` (`A7S_KERNEL_REVISION=r1`), `v6.18.59-T1` builds `6.18.59-t1`.
-Local builds without a revision are the same kernel, named `6.18.59`.
+The tag gives the kernel a revision: `v6.18.60-R1` builds the kernel release
+`6.18.60-r1` (`A7S_KERNEL_REVISION=r1`), `v6.18.60-T1` builds `6.18.60-t1`.
+Local builds without a revision are the same kernel, named `6.18.60`.
 
 Attached to a release:
 

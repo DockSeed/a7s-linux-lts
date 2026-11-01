@@ -11,17 +11,17 @@
 # Output: OUT_DIR/{Image,<dtb>,config,System.map,modules/,KERNEL-ID}.
 
 # --- pins -----------------------------------------------------------------------
-# Linux stable v6.18.59 (longterm). The sha256 is the one cdn.kernel.org lists
+# Linux stable v6.18.60 (longterm). The sha256 is the one cdn.kernel.org lists
 # in its signed sha256sums.asc (checked with the kernel.org autosigner key
 # B8868C80BA62A1FFFAF5FDA9632D3A06589DA6B1; the tarball's own signature
-# linux-6.18.59.tar.sign by Greg Kroah-Hartman, 647F28654894E3BD457199BE38DBBDC86092693E,
+# linux-6.18.60.tar.sign by Greg Kroah-Hartman, 647F28654894E3BD457199BE38DBBDC86092693E,
 # is good over the uncompressed tar). fetch refuses any other bytes.
 # A version bump is: the version and sha256 here, and every patch that no
 # longer applies at fuzz 0.
-KERNEL_VERSION="6.18.59"
+KERNEL_VERSION="6.18.60"
 KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
 KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_VERSION%%.*}.x/${KERNEL_TARBALL}"
-KERNEL_SHA256="53a55ac9863a5547e292b8e381d4e4c2240dd1127d5428a7c44dbc550be23963"
+KERNEL_SHA256="3c2f44ef6acc021a7ad444d9a2e6ec1ef488ff09368793d0004a6080f69d621e"
 KERNEL_ARCH="arm64"
 # The boot dtb built and shipped (relative to arch/arm64/boot/dts/).
 KERNEL_DTB="${A7S_KERNEL_DTB:-allwinner/sun60i-a733-cubie-a7s.dtb}"
@@ -120,8 +120,8 @@ stage_apply_patches() {
 }
 
 # The revision of a release build: A7S_KERNEL_REVISION=r1 or t1 (from the tag
-# v6.18.59-R1 or -T1). It becomes the local version of the kernel (release
-# 6.18.59-r1), so that /lib/modules/<release> and the Debian package names of
+# v6.18.60-R1 or -T1). It becomes the local version of the kernel (release
+# 6.18.60-r1), so that /lib/modules/<release> and the Debian package names of
 # two releases of one kernel version differ. Unlike A7S_LOCALVERSION it is not a
 # developer variant: it is part of the identity (key, KERNEL-ID).
 kernel_revision_check() {

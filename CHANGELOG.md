@@ -15,7 +15,10 @@ may be short).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- Linux 6.18.60 (longterm) as the base, up from 6.18.59. The series applies
+  unchanged at fuzz 0 without offsets.
 
 ## [6.18.59-R2] - 2026-10-31
 
