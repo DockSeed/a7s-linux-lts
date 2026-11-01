@@ -15,6 +15,14 @@ may be short).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [6.18.60-R2] - 2026-11-01
+
+The kernel of 6.18.60-R1 with one backport from mainline. Configuration and the
+packages are the same; `sudo a7s-kernel-update` on a board with 6.18.60-R1
+installs this release.
+
 ### Fixed
 
 - A boot in which the pin controller is ready before the PMIC's regulators no
