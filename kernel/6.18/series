@@ -172,6 +172,7 @@ soc/pinctrl/pinctrl-sunxi-a733-2-bit-pow-mod-sel-io-bias.patch
 soc/pinctrl/pinctrl-sunxi-a733-set-the-withstand-mode-of-bank-pf-with-its-supply.patch
 soc/pinctrl/pinctrl-sunxi-add-a733-r-pinctrl.patch
 soc/pinctrl/pinctrl-sunxi-a733-drop-the-irq-remux-on-read.patch
+backport/pinctrl-core-use-dev_err_probe-when-applying-state.patch
 soc/thermal/thermal-sun8i-a733-filter-the-trend-fed-to-step-wise.patch
 soc/thermal/thermal-sun8i-a733-init-per-the-um-query-mode.patch
 soc/thermal/thermal-sun8i-a733-factory-calibration-from-the-sid.patch

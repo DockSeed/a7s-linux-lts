@@ -3,7 +3,7 @@
 `kernel/6.18/` is the kernel input of this recipe (the AIC8800 driver is in
 `out-of-tree/aic8800/`):
 
-- `series`: 263 patch paths, applied in this order to the pristine
+- `series`: 264 patch paths, applied in this order to the pristine
   `linux-6.18.60.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
 - `patches/`: `backport/` (other people's patches, to drop once 6.18.y has
   them), `soc/<subsystem>/` (A733 support, any A733 board) and `board/dts/`
@@ -266,7 +266,7 @@ lines of `pinctrl-sunxi-instrument-the-power-source-handler` (silent until
 
 ## Checked
 
-Against the pristine tree in the builder container: all 263 patches apply at
+Against the pristine tree in the builder container: all 264 patches apply at
 fuzz 0 without offsets; `make a7s_defconfig && make savedefconfig` reproduces
 `config` (apart from its header comment); `make dtbs` and `make W=1` over the
 display, PHY, PCIe, CCU, pin controller and USB/Bluetooth code touched by the

@@ -1,0 +1,45 @@
+From 33d4feff673bb32d3c94a6f25e7ca0be966ef410 Mon Sep 17 00:00:00 2001
+From: Michal Piekos <michal.piekos@mmpsystems.pl>
+Date: Sun, 1 Mar 2026 17:46:31 +0100
+Subject: pinctrl: core: use dev_err_probe() when applying state
+
+[ Upstream commit 33d4feff673bb32d3c94a6f25e7ca0be966ef410 ]
+
+When applying a pinctrl state, -EPROBE_DEFER may be returned if
+dependencies are not ready and the consumer will retry probing.
+
+This is normal probe ordering behaviour and not a real error.
+However, pinctrl core currently logs:
+
+  "Error applying setting, reverse things back"
+
+even when the return value is -EPROBE_DEFER, resulting in noisy
+boot-time error messages.
+
+Replace dev_err() with dev_err_probe() to handle -EPROBE_DEFER
+consistently and suppress error logging for deferred probes.
+
+No functional change intended.
+
+Signed-off-by: Michal Piekos <michal.piekos@mmpsystems.pl>
+Signed-off-by: Linus Walleij <linusw@kernel.org>
+[ adapted: the hunk is regenerated against 6.18.60, where the context
+  starts one line earlier; the code change is the same. ]
+---
+ drivers/pinctrl/core.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index c5dbf4e..6ceb583 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -1349,7 +1349,8 @@ unapply_mux_setting:
+ 	goto restore_old_state;
+ 
+ unapply_new_state:
+-	dev_err(p->dev, "Error applying setting, reverse things back\n");
++	dev_err_probe(p->dev, ret,
++		      "Error applying setting, reverse things back\n");
+ 
+ 	/*
+ 	 * All we can do here is pinmux_disable_setting.

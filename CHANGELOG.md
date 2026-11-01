@@ -15,7 +15,14 @@ may be short).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- A boot in which the pin controller is ready before the PMIC's regulators no
+  longer logs `Error applying setting, reverse things back` for the devices
+  whose pins wait for those supplies (PWM, UARTs, Ethernet); the devices probe
+  again later as before. Backport of upstream commit 33d4feff673b
+  ("pinctrl: core: use dev_err_probe() when applying state"), which is not in
+  6.18.60.
 
 ## [6.18.60-R1] - 2026-11-01
 
