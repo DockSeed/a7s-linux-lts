@@ -157,3 +157,5 @@ Our own files are `GPL-2.0-only OR MIT`. The patches and the config are
 The repository as a whole can be shared under GPL-2.0 ([LICENSE](LICENSE)).
 Full texts in [LICENSES/](LICENSES/), assignments in [REUSE.toml](REUSE.toml);
 `reuse lint` checks them.
+
+Unofficial; not affiliated with or authorized by Radxa or Allwinner.

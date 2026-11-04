@@ -21,8 +21,9 @@ Changes against that patch for Linux 6.18:
   from the silicon (the existing entry targets ...4411).
 - config_init sets LED1 to show link at 1000/100/10 Mbit/s and activity;
   the power-on default lights it only on a 100 Mbit/s link.
-- SPDX line added, maxio_mae0621a_suspend() made static, Kconfig and
-  Makefile lines indented with tabs.
+- SPDX line added (derived from the original's MODULE_LICENSE("GPL"),
+  which is the only licence statement in it), maxio_mae0621a_suspend()
+  made static, Kconfig and Makefile lines indented with tabs.
 - left out: the phy_device.c PHY ID read quirk (meant for several PHYs
   on one MDIO bus, compiled only with CONFIG_MAXIO_PHY=y) and the
   stmmac_main.c resume hook (its 6.14 hunk does not apply to 6.18).
