@@ -1,10 +1,10 @@
-# Kernel: Linux 6.18.60
+# Kernel: Linux 6.18.62
 
 `kernel/6.18/` is the kernel input of this recipe (the AIC8800 driver is in
 `out-of-tree/aic8800/`):
 
 - `series`: 264 patch paths, applied in this order to the pristine
-  `linux-6.18.60.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
+  `linux-6.18.62.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
 - `patches/`: `backport/` (other people's patches, to drop once 6.18.y has
   them), `soc/<subsystem>/` (A733 support, any A733 board) and `board/dts/`
   (Cubie A7S wiring). File names carry no numbers; the order lives in `series`.
@@ -38,9 +38,9 @@ The command is part of the package `a7s-kernel-hook`, which the images of
 a7s-build carry.
 
 1. `sudo a7s-kernel-update` installs the latest release (GitHub's "latest"
-   leaves out drafts and pre-releases); `sudo a7s-kernel-update v6.18.60-R2`
+   leaves out drafts and pre-releases); `sudo a7s-kernel-update v6.18.62-R1`
    installs that release; a published test build is named the same way
-   (`v6.18.60-T1`, a pre-release, with a note that it is one). It downloads the three packages
+   (`v6.18.62-T1`, a pre-release, with a note that it is one). It downloads the three packages
    of the release to a temporary directory below `/var/cache/a7s-kernel-update`,
    checks their sha256 against the release's `SHA256SUMS` (a mismatch removes
    the files and stops), installs them with `apt-get` and removes the directory.

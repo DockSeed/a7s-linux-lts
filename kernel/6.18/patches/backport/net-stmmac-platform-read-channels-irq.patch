@@ -22,7 +22,7 @@ diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net
 index 3b514a702612d5..59aac0afc609a2 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -733,9 +733,47 @@ struct clk *stmmac_pltfr_find_clk(struct plat_stmmacenet_data *plat_dat,
+@@ -731,9 +731,47 @@ struct clk *stmmac_pltfr_find_clk(struct plat_stmmacenet_data *plat_dat,
  }
  EXPORT_SYMBOL_GPL(stmmac_pltfr_find_clk);
  
@@ -70,7 +70,7 @@ index 3b514a702612d5..59aac0afc609a2 100644
  	memset(stmmac_res, 0, sizeof(*stmmac_res));
  
  	/* Get IRQ information early to have an ability to ask for deferred
-@@ -771,7 +809,24 @@ int stmmac_get_platform_resources(struct platform_device *pdev,
+@@ -769,7 +807,24 @@ int stmmac_get_platform_resources(struct platform_device *pdev,
  
  	stmmac_res->addr = devm_platform_ioremap_resource(pdev, 0);
  

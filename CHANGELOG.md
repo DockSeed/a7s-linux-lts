@@ -17,6 +17,31 @@ may be short).
 
 Nothing yet.
 
+## [6.18.62-R1] - 2026-11-08
+
+The recipe of 6.18.60-R2 on Linux 6.18.62. Configuration and the packages are
+the same; `sudo a7s-kernel-update` on a board with 6.18.60-R2 installs this
+release.
+
+### Changed
+
+- Linux 6.18.62 (longterm) as the base, up from 6.18.60, with the fixes of the
+  two stable releases in between
+  ([ChangeLog-6.18.61](https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.61),
+  [ChangeLog-6.18.62](https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.62)).
+- Six patches regenerated against the new base, because stable changed the
+  surrounding lines of `stmmac_main.c`, `stmmac_platform.c`, `btusb.c`
+  and `pci.c`: only hunk offsets differ, not the patched code.
+  `net-stmmac-move-msi-data-out-of-struct-stmmac_priv`,
+  `net-stmmac-platform-read-channels-irq`,
+  `net-stmmac-retry-a-failed-rx-refill-from-a-timer`,
+  `bluetooth-btusb-request-the-reset-gpio-only-where-a-handler-uses-it`,
+  `pci-err-reset-root-ports-platform-specific` and
+  `pci-host-common-link-down-handling-for-root-ports`. The rest of the series
+  applies unchanged at fuzz 0 without offsets.
+- None of the backports in `kernel/6.18/patches/backport/` is in 6.18.61 or
+  6.18.62, so all stay.
+
 ## [6.18.60-R2] - 2026-11-01
 
 The kernel of 6.18.60-R1 with one backport from mainline. Configuration and the

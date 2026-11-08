@@ -204,7 +204,7 @@ Assisted-by: Claude
  		if (queue < tx_queues_cnt)
  			napi_enable(&ch->tx_napi);
  	}
-@@ -5820,6 +5841,57 @@
+@@ -5824,6 +5845,57 @@
  	return count;
  }
  
@@ -262,7 +262,7 @@ Assisted-by: Claude
  static int stmmac_napi_poll_rx(struct napi_struct *napi, int budget)
  {
  	struct stmmac_channel *ch =
-@@ -5835,6 +5907,8 @@
+@@ -5839,6 +5911,8 @@
  	u64_stats_update_end(&rxq_stats->napi_syncp);
  
  	work_done = stmmac_rx(priv, budget, chan);
@@ -271,7 +271,7 @@ Assisted-by: Claude
  	if (work_done < budget && napi_complete_done(napi, work_done)) {
  		unsigned long flags;
  
-@@ -7426,6 +7500,8 @@
+@@ -7430,6 +7504,8 @@
  
  		if (queue < priv->plat->rx_queues_to_use) {
  			netif_napi_add(dev, &ch->rx_napi, stmmac_napi_poll_rx);
