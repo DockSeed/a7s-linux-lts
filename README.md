@@ -73,8 +73,8 @@ as a variant.
 
 ## Releases
 
-A release is named `v<kernel version>-R<n>` (`v6.18.62-R1`); a test build is
-`v<kernel version>-T<n>` (`v6.18.62-T1`). Both are built by GitHub Actions
+A release is named `v<kernel version>-R<n>` (`v6.18.63-R1`); a test build is
+`v<kernel version>-T<n>` (`v6.18.63-T1`). Both are built by GitHub Actions
 ([release.yml](.github/workflows/release.yml)) from the tagged commit with
 `./build.sh all`, `deb` and `package`, in the same pinned builder container, on a
 GitHub-hosted x86_64 runner. The text of a release is its section in
@@ -87,9 +87,9 @@ Releases follow Linux stable 6.18 when we get to it; there is no schedule and
 no guarantee that a given fix, security fixes included, is released, or how
 soon.
 
-The tag gives the kernel a revision: `v6.18.62-R1` builds the kernel release
-`6.18.62-r1` (`A7S_KERNEL_REVISION=r1`), `v6.18.62-T1` builds `6.18.62-t1`.
-Local builds without a revision are the same kernel, named `6.18.62`.
+The tag gives the kernel a revision: `v6.18.63-R1` builds the kernel release
+`6.18.63-r1` (`A7S_KERNEL_REVISION=r1`), `v6.18.63-T1` builds `6.18.63-t1`.
+Local builds without a revision are the same kernel, named `6.18.63`.
 
 Attached to a release:
 
@@ -107,7 +107,7 @@ Attached to a release:
 The WLAN/BT driver is not part of the releases (the image recipe builds it).
 The packages are named for the release, so a newer one installs beside an older
 one and the older kernel stays bootable. On a board, `sudo a7s-kernel-update` downloads and installs the newest release
-(or the one named, `v6.18.62-R1`), and the hook makes the new kernel the next
+(or the one named, `v6.18.63-R1`), and the hook makes the new kernel the next
 boot ([docs/kernel.md](docs/kernel.md), "Installing a kernel on the
 board"); without the hook, the packages write no boot entry. Versions: `R<n>`
 is `<kernel version>-<n>`, `T<n>` is `<kernel version>~t<n>-1` (in file names the `~` is a `.`), which sorts before the release of the same kernel
