@@ -1,0 +1,64 @@
+From e06b678e3b4e12fdaa0b51a7a5a54abc5dbd6469 Mon Sep 17 00:00:00 2001
+From: Waiman Long <longman@redhat.com>
+Date: Tue, 29 Sep 2026 23:18:33 -0400
+Subject: cgroup/cpuset: Don't access cpuset_cgrp_subsys.root in is_in_v2_mode()
+
+[ Upstream commit e06b678e3b4e12fdaa0b51a7a5a54abc5dbd6469 ]
+
+After seeing the patch [1] to guard is_in_v2_mode() with RCU, it makes
+me realize that is_in_v2_mode() may be called in a context where a new
+cgroup filesystem is being rebound with stale cpuset_cgrp_subsys.root
+pointer. Avoid this potential UaF situation by adding a new cpuset_v2_mode
+flag which is set when the cpuset_v2_mode mount option is used. This
+flag is written into only when cpuset_bind() is being called with a
+stable cpuset_cgrp_subsys.root value. The is_in_v2_mode() helper is
+modified to read the new cpuset_v2_mode flag instead of accessing
+cpuset_cgrp_subsys.root directly.
+
+[1] https://lore.kernel.org/lkml/20260929084124.626693-2-arighi@nvidia.com
+
+Fixes: b8d1b8ee93df ("cpuset: Allow v2 behavior in v1 cgroup")
+Signed-off-by: Waiman Long <longman@redhat.com>
+Reviewed-by: Ridong Chen <ridong.chen@linux.dev>
+Reviewed-by: Andrea Righi <arighi@nvidia.com>
+Signed-off-by: Tejun Heo <tj@kernel.org>
+[ adapted: the surrounding lines differ in 6.18, so the hunks are
+  regenerated against 6.18.63; the added and removed lines are
+  upstream's ]
+Assisted-by: Claude
+---
+diff --git a/kernel/cgroup/cpuset.c b/kernel/cgroup/cpuset.c
+--- a/kernel/cgroup/cpuset.c
++++ b/kernel/cgroup/cpuset.c
+@@ -170,6 +170,12 @@ static inline bool cs_is_member(const struct cpuset *cs)
+ 	return cs->partition_root_state == PRS_MEMBER;
+ }
+ 
++/*
++ * Set if "cpuset_v2_mode" mount option is used
++ * Cached at bind time and not lock protected; accessed via {READ,WRITE}_ONCE
++ */
++static bool		cpuset_v2_mode;
++
+ /*
+  * Callers should hold callback_lock to modify partition_root_state.
+  */
+@@ -348,8 +354,7 @@ static inline bool cpuset_v2(void)
+  */
+ static inline bool is_in_v2_mode(void)
+ {
+-	return cpuset_v2() ||
+-	      (cpuset_cgrp_subsys.root->flags & CGRP_ROOT_CPUSET_V2_MODE);
++	return cpuset_v2() || READ_ONCE(cpuset_v2_mode);
+ }
+ 
+ static inline bool cpuset_is_populated(struct cpuset *cs)
+@@ -3795,6 +3800,8 @@ static void cpuset_bind(struct cgroup_subsys_state *root_css)
+ 	mutex_lock(&cpuset_mutex);
+ 	spin_lock_irq(&callback_lock);
+ 
++	WRITE_ONCE(cpuset_v2_mode,
++		   !!(cpuset_cgrp_subsys.root->flags & CGRP_ROOT_CPUSET_V2_MODE));
+ 	if (is_in_v2_mode()) {
+ 		cpumask_copy(top_cpuset.cpus_allowed, cpu_possible_mask);
+ 		cpumask_copy(top_cpuset.effective_xcpus, cpu_possible_mask);

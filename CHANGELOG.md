@@ -19,9 +19,9 @@ Nothing yet.
 
 ## [6.18.63-R1] - 2026-11-11
 
-The recipe of 6.18.62-R1 on Linux 6.18.63. Configuration and the packages are
-the same; `sudo a7s-kernel-update` on a board with 6.18.62-R1 installs this
-release.
+The recipe of 6.18.62-R1 on Linux 6.18.63, with fixes for 16 CVEs that
+6.18.63 does not carry. Configuration and the packages are the same;
+`sudo a7s-kernel-update` on a board with 6.18.62-R1 installs this release.
 
 ### Changed
 
@@ -37,6 +37,33 @@ release.
   applies unchanged at fuzz 0 without offsets.
 - None of the backports in `kernel/6.18/patches/backport/` is in 6.18.63, so
   all stay.
+
+### Security
+
+The kernel CVE team listed 106 CVEs as unfixed in 6.18.63 (vulns.git of
+2026-11-10). This release:
+
+- fixes 16 with patches in `kernel/6.18/patches/cve/`: CVE-2026-46017,
+  CVE-2026-89632, CVE-2026-98125, CVE-2026-98285, CVE-2026-98376,
+  CVE-2026-98427, CVE-2026-98444, CVE-2026-98551, CVE-2026-98570,
+  CVE-2026-98599, CVE-2026-98814, CVE-2026-98954, CVE-2026-98960,
+  CVE-2026-98972, CVE-2026-99272, CVE-2026-99275;
+- is not affected by 61: for 49 the fixed code is not built, for 2 the fix
+  leaves every built object byte-identical, 4 concern code that 6.18 does not
+  have (CVE-2026-31710, CVE-2026-74342, CVE-2026-89772, CVE-2026-98983), and 6
+  are not reachable with this configuration and device tree (CVE-2026-43042
+  MPLS, CVE-2026-43174 io_uring zero-copy receive, CVE-2026-43326 sched_ext,
+  CVE-2026-80899 erofs on-demand, CVE-2026-98124 fscache, CVE-2026-98288
+  stmmac TSO; see `docs/kernel.md`, *CVE fixes*);
+- leaves 29 open, whose fix needs a backport by hand and is expected from a
+  later 6.18 stable release: CVE-2026-53091, CVE-2026-53106, CVE-2026-64160,
+  CVE-2026-74314, CVE-2026-74354, CVE-2026-74533, CVE-2026-89584,
+  CVE-2026-90237, CVE-2026-90256, CVE-2026-93044, CVE-2026-93270,
+  CVE-2026-98118, CVE-2026-98153, CVE-2026-98284, CVE-2026-98318,
+  CVE-2026-98558, CVE-2026-98589, CVE-2026-98628, CVE-2026-98747,
+  CVE-2026-98788, CVE-2026-98789, CVE-2026-98799, CVE-2026-98800,
+  CVE-2026-98813, CVE-2026-98815, CVE-2026-98816, CVE-2026-98818,
+  CVE-2026-98869, CVE-2026-100073.
 
 ## [6.18.62-R1] - 2026-11-08
 

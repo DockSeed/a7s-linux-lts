@@ -3,10 +3,11 @@
 `kernel/6.18/` is the kernel input of this recipe (the AIC8800 driver is in
 `out-of-tree/aic8800/`):
 
-- `series`: 264 patch paths, applied in this order to the pristine
+- `series`: 280 patch paths, applied in this order to the pristine
   `linux-6.18.63.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
 - `patches/`: `backport/` (other people's patches, to drop once 6.18.y has
-  them), `soc/<subsystem>/` (A733 support, any A733 board) and `board/dts/`
+  them), `cve/` (fixes for CVEs that 6.18.y does not carry yet, see
+  [CVE fixes](#cve-fixes)), `soc/<subsystem>/` (A733 support, any A733 board) and `board/dts/`
   (Cubie A7S wiring). File names carry no numbers; the order lives in `series`.
 - `config`: a defconfig (output of `make savedefconfig`). Install it as
   `arch/arm64/configs/a7s_defconfig` and run `make a7s_defconfig`.
@@ -264,9 +265,30 @@ lines of `pinctrl-sunxi-instrument-the-power-source-handler` (silent until
 `dyndbg="file pinctrl-sunxi.c +p"`) and the warnings of
 `drm-a733-dp-instrument-the-training-failure-paths` on a failed link training.
 
+## CVE fixes
+
+`patches/cve/` holds fixes for CVEs that the kernel CVE team
+([vulns.git](https://git.kernel.org/pub/scm/linux/security/vulns.git)) lists
+as unfixed in the 6.18 stable release this recipe builds. Each is the mainline
+commit or, where that does not apply, the backport of another stable branch or
+the 6.18 stable queue; the header names the source, and `[ adapted: … ]` marks
+the ones whose context or code differs from it. They come last in `series`.
+When a stable release brings one of them, it no longer applies (it applies in
+reverse) and the bump drops it.
+
+A CVE counts as not affecting this kernel when the files of its fix produce no
+object in the build, when the fixed objects come out byte-identical, or when the
+broken code is not in 6.18 or not reachable with this configuration. The last
+group depends on the configuration and the device tree: with the base config
+and the shipped dtb, MPLS, sched_ext, the erofs on-demand (fscache) backend and
+fscache itself are off, no built network driver offers the queue management
+that io_uring zero-copy receive needs, and the GMAC has no `snps,tso`. Turning
+one of these on makes its CVEs apply again. The state per release is in
+[CHANGELOG.md](../CHANGELOG.md).
+
 ## Checked
 
-Against the pristine tree in the builder container: all 264 patches apply at
+Against the pristine tree in the builder container: all 280 patches apply at
 fuzz 0 without offsets; `make a7s_defconfig && make savedefconfig` reproduces
 `config` (apart from its header comment); `make dtbs` and `make W=1` over the
 display, PHY, PCIe, CCU, pin controller and USB/Bluetooth code touched by the
