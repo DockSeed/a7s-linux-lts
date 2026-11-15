@@ -17,6 +17,19 @@ may be short).
 
 Nothing yet.
 
+## [6.18.63-R2] - 2026-11-15
+
+6.18.63-R1 with the `netconsole` module added; the patches, the configuration
+otherwise and the dtb are unchanged. `sudo a7s-kernel-update` on a board with an
+earlier release installs this one.
+
+### Added
+
+- `CONFIG_NETCONSOLE=m` (which selects `NETPOLL`): the `netconsole` module sends
+  kernel log messages over UDP to another host
+  (`modprobe netconsole netconsole=<src-port>@<src-ip>/<dev>,<tgt-port>@<tgt-ip>/<tgt-mac>`),
+  to capture oops and panic output when no serial console is attached.
+
 ## [6.18.63-R1] - 2026-11-11
 
 The recipe of 6.18.62-R1 on Linux 6.18.63, with fixes for 16 CVEs that

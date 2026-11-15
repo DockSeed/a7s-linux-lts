@@ -132,6 +132,7 @@ m DRM_GPUVM
 m DRM_SCHED
 m DRM_GEM_SHMEM_HELPER
 m FUSE_FS
+m NETCONSOLE
 m NETFILTER_NETLINK
 m NF_CONNTRACK
 m NF_DEFRAG_IPV4
@@ -206,6 +207,7 @@ file drm_shmem_helper.ko
 file powervr.ko
 file fuse.ko
 file onboard_usb_dev.ko
+file netconsole.ko
 file usbserial.ko
 file cp210x.ko
 file ftdi_sio.ko
