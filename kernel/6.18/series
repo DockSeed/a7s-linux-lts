@@ -103,6 +103,8 @@ soc/usb/usb-dwc3-a733-program-lcsr-tx-deemph-for-gen2.patch
 soc/usb/phy-allwinner-a733-combophy-lane-comments-follow-reference.patch
 soc/usb/phy-allwinner-a733-combophy-hand-comb0-back-to-usb3-after-dp.patch
 soc/usb/phy-allwinner-a733-combophy-latch-the-plug-direction-in-reset.patch
+soc/usb/dt-bindings-phy-sun50i-a64-usb-phy-add-the-a733.patch
+soc/usb/phy-sun4i-usb-use-incr16-bursts-on-the-a733.patch
 soc/display/drm-allwinner-a733-displayport-aux.patch
 soc/display/drm-a733-dp-configure-the-main-link-phy.patch
 soc/display/drm-a733-tcon-tv1-timing-generator-and-video-source.patch

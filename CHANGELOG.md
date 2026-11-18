@@ -17,6 +17,22 @@ may be short).
 
 Nothing yet.
 
+## [6.18.63-T1] - 2026-11-18
+
+Test build: 6.18.63-R2 with the A733 USB host burst fix below; nothing else
+changes.
+
+### Fixed
+
+- USB host on the A733: the HCI interface register now selects AHB INCR16
+  bursts instead of INCR8, as the vendor kernel does for this SoC
+  (`phy-sun4i-usb-use-incr16-bursts-on-the-a733`). With INCR8 the AIC8800
+  WLAN on USB1 stopped under memory load from a second bus master (desktop
+  with glamor and video, or CPU writes plus a Vulkan load); the register reads
+  `0x0b01` instead of `0x0701`. The binding gains the A733 compatible that the
+  device tree already uses (`dt-bindings-phy-sun50i-a64-usb-phy-add-the-a733`),
+  so `dtbs_check` accepts the node. Other SoCs are unchanged.
+
 ## [6.18.63-R2] - 2026-11-15
 
 6.18.63-R1 with the `netconsole` module added; the patches, the configuration
