@@ -14,7 +14,14 @@ SPDX-License-Identifier = "GPL-2.0-only"
 [[annotations]]
 path = "out-of-tree/aic8800/patches/**"
 precedence = "override"
-SPDX-FileCopyrightText = "AICSemi and the a7s-linux-lts contributors"
+SPDX-FileCopyrightText = "AICSemi, RivieraWaves and the a7s-linux-lts contributors"
+SPDX-License-Identifier = "GPL-2.0-only"
+
+# Other projects' patches, unchanged; patches/upstream/series names each source.
+[[annotations]]
+path = "out-of-tree/aic8800/patches/upstream/*.patch"
+precedence = "override"
+SPDX-FileCopyrightText = ["Feng Zhang <feng@radxa.com>", "Jiali Chen <chenjiali@radxa.com>", "bnister", "AICSemi", "RivieraWaves"]
 SPDX-License-Identifier = "GPL-2.0-only"
 
 # Everything else without an inline header: README, docs, pins, package list and

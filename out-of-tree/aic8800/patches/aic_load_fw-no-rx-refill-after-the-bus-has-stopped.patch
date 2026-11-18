@@ -1,120 +1,25 @@
 From: DockSeed <dockseed@proton.me>
 Subject: [PATCH] aic_load_fw: no rx refill after the bus has stopped
 
-Seen on the 8 GiB board, 2026-09-24, in
-`journalctl -b -p err` of a normal boot with the radio up:
-  usb_err:<aicwf_usb_rx_submit_all_urb,311>: bus is not up=0
-The same text appeared on the 6 GiB board in a cold-start series of
-2026-09-21 (506 ms after `aicwf_usb_disconnect enter`). It does not come on
-every boot.
+On some boots the log shows "aicwf_usb_rx_submit_all_urb: bus is not up"
+at error level. If the refill queued by a rx completion is still pending
+when aicwf_usb_bus_stop() sets USB_DOWN_ST, it runs afterwards and
+prints the error. On the probe error path, URBs killed by the stop queue
+a refill without a state check.
 
-Code reading (aic_load_fw, pinned tag plus the preceding patches in patches/series; kernel 6.18.36):
-- After the firmware upload the part leaves the bus to come back under its
-  loaded id. Its rx URBs complete with errors as it drops off, and whatever
-  is left the USB core terminates before it calls ->disconnect
-  (drivers/usb/core/driver.c:455-458, usb_disable_interface() ->
-  usb_hcd_flush_endpoint(), -ESHUTDOWN). So every rx URB is given back before
-  ->disconnect, and each completion queues rx_urb_work (aicwf_usb.c:235)
-  while the bus is still up; the work finds app_cmp set and returns (:314).
-  On a boot that is 20 `app_cmp` lines, 75 us apart, before
-  `aicwf_usb_disconnect enter`.
-- The hub event and the refill work run in the same per-CPU worker pool
-  (usb_hub_wq and system_percpu_wq are both per-CPU; the completions come
-  from the same host controller's bottom half). The pool starts no second
-  worker while one is running (kernel/workqueue.c:941-944, :3427-3430). If
-  the hub worker gets the CPU back before the worker woken for the last
-  refill, that refill stays pending while aicwf_usb_disconnect() ->
-  aicwf_bus_deinit() busy-waits 500 ms (aic_txrxif.c:96, mdelay; the pool's
-  CPU-intensive escape is 1 s on this board, workqueue.c:7948-7953 with
-  lpj 96000) and aicwf_usb_bus_stop() sets USB_DOWN_ST (aicwf_usb.c:740).
-  The refill runs at the hub worker's next sleep, finds the bus down and
-  prints through usb_err() = pr_err (:311). Who wins the CPU is the race:
-  some boots.
-- The work is cancelled only in aicwf_usb_deinit() (:746), after the bus has
-  been stopped and the 500 ms are over.
-- The probe's own error path stops the bus with rx URBs still in flight: the
-  reboot of a part already at its loaded id (rwnx_send_reboot, :1851), of a
-  part below high speed (system_reboot, :1842), and a failed configuration or
-  upload (:1855, :1859). The stop kills them
-  (:741 -> :726), and both error branches of aicwf_usb_rx_complete() (:228,
-  :235) queue a refill without the state check its data branch makes (:239):
-  the same print again.
+aicwf_usb_bus_stop() now cancels a pending refill before it sets
+USB_DOWN_ST, and both error branches of aicwf_usb_rx_complete() queue a
+refill only in USB_UP_ST, like the data branch. Nothing changes on a
+bus that is up.
 
-Stopping the bus does not retire the rx refill, so a refill queued while the
-bus was up can run after it is down, and URBs the stop itself kills ask for
-another one. The work then reports the intended state as an error.
-aic8800-give-the-boot-path-prints-a-log-level keeps failure prints at warning
-level so that the log tells a dead radio from a working one; this line blurs
-that on a working radio.
-
-What changes:
-- aicwf_usb_bus_stop() cancels a refill that is still pending before it sets
-  USB_DOWN_ST. On the disconnect path nothing can queue a new one after that:
-  every rx URB was given back before ->disconnect, and a refill would not
-  resubmit anyway (app_cmp).
-- Both error branches of the completion queue a refill only in USB_UP_ST, the
-  data branch's rule, so URBs the stop kills queue none.
-The print is not touched and keeps its level. On a bus that is up nothing
-changes; a refill withheld on a stopped bus would have done nothing but print.
-What is left: on the probe error path, a completion in the few instructions
-between the cancel and the state change still queues a refill, which then runs
-during the kill and prints this line, or "usb state is not up!" (:271) and "usb
-rx refill fail" (:321) if it straddles the change. The disconnect path has no
-such window: no URB is left there to complete.
-
-The cancel comes before the state change: a pending refill then never runs
-and prints. The mdelay(500) in aicwf_bus_deinit() is not changed; it is not what
-opens the race: two older copies in the tag have no delay there, and their stop
-follows the flush without a sleep in between just the same. A refill is not
-suppressed on every negative completion status: one queued for another status
-(a transaction error while the part drops off the bus) would be starved the
-same way, and it would also be dropped after a transient error on a live bus.
-
-Cross-read in the pinned tag: all seven copies of aic_load_fw/aicwf_usb.c
-(ours and six under src/USB/patch/) have the same completion and the same
-stop, and two older aic8800_fdrv copies there the same logic; the aic8800_fdrv
-copies of the SDIO and PCIe trees queue the refill from both error branches
-the same way. Our aic8800_fdrv does not hit it: it refills
-inside the completion with no work item, returns on `urb->status < 0` without
-a refill, its bus stop kills no URBs (:2008), and aicwf_bus_deinit() kills
-them after the stop (aicwf_txrxif.c:217). Its zero-length and oversized
-branches do refill without a state check; a zero-length completion on a
-stopped bus would print its own "bus is not up" (AICWFDBG LOGERROR =
-KERN_WARNING, :885, msg-in copy :954). No log in this tree has that line. Not
-changed.
-
-Diagnostics under /sys/module/aic_load_fw/parameters:
-- rx_loader_refill_cancelled (0444) counts refills still pending when the bus
-  stopped; on the disconnect path each one is a refill that would otherwise
-  run after the stop.
-- rx_loader_refill_skipped (0444) counts completions on a stopped bus that
-  queued no refill (the probe error path).
-- rx_loader_inject_pending_refill (0644), the stimulus: the next N disconnects
-  queue the refill from the hub worker right before aicwf_bus_deinit(), which
-  leaves it pending through the busy-wait -- the state the race produces on
-  its own. It has to be armed before the loader loads, i.e. on the kernel
-  command line. The race by itself is rare on our kernel: one line in 43
-  boots of the 8 GiB board's console log, none in 24 cold boots of the
-  default image.
-
-Check, on the board:
-1. With `aic_load_fw.rx_loader_inject_pending_refill=1` on the command line, a
-   build that carries only the stimulus prints the line on (almost) every
-   boot, about 500 ms after `aicwf_usb_disconnect enter`: the refill runs at
-   the hub worker's first sleep after the stop. If that worker reaches the
-   late cancel in aicwf_usb_deinit() without sleeping, the refill is swallowed and the boot
-   shows nothing -- a stimulus miss, not evidence either way. With this patch
-   no boot prints it, rx_loader_refill_cancelled reads 1 and
-   rx_loader_refill_skipped 0. The stimulus reads 0 afterwards in both, so it
-   fired.
-2. Without the stimulus, cold boots with this patch print no line, and wl0 and
-   both modules are there on every boot.
-One boot with the line and this patch refutes it.
+New parameters: rx_loader_refill_cancelled and rx_loader_refill_skipped
+(0444), and rx_loader_inject_pending_refill (0644), which queues a
+refill before the bus stops on the next N disconnects.
 
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
-index c43fd3f..8d31a5f 100644
+index e8d6425..41702f0 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 @@ -211,6 +211,32 @@ static void aicwf_usb_tx_complete(struct urb *urb)

@@ -1,0 +1,40 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: bound the scan result frame to its message
+
+rwnx_rx_scanu_result_ind() takes ind->length from the device as the
+length of the beacon or probe response in ind->payload and does not check
+it against the message. A length past the message makes
+cfg80211_inform_bss() read behind the buffer. A length below the probe
+response header makes ielen wrap to a huge size_t, and the handler also
+writes the timestamp into that header.
+
+Require the frame to fit in msg->param_len (clamped to the received frame
+by rwnx_rx_handle_msg()) and to hold the probe response header.
+Otherwise drop the result and count it in rx_bad_frame_drops.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index a52adc6..dd7ff5e 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -766,7 +766,18 @@ static inline int rwnx_rx_scanu_result_ind(struct rwnx_hw *rwnx_hw,
+ 
+ 
+     RWNX_DBG(RWNX_FN_ENTRY_STR);
+-	
++
++    /* ind->length is the frame length from the device. The frame must lie
++     * inside the message, and it must hold the probe response header:
++     * the timestamp is written into it and ielen is length minus that
++     * header (a shorter frame made ielen wrap to a huge size_t). */
++    if (msg->param_len < offsetof(struct scanu_result_ind, payload) ||
++        len > msg->param_len - offsetof(struct scanu_result_ind, payload) ||
++        len < offsetof(struct ieee80211_mgmt, u.probe_resp.variable)) {
++        rx_bad_frame_drops++;
++        return 0;
++    }
++
+     chan = ieee80211_get_channel(rwnx_hw->wiphy, ind->center_freq);
+ 
+     if (chan != NULL) {

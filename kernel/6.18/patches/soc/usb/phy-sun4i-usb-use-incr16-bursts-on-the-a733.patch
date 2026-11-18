@@ -1,0 +1,103 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] phy: sun4i-usb: use INCR16 instead of INCR8 bursts on the A733
+
+phy_init sets INCR8 (bit 10) in the HCI interface register (pmu0/pmu1,
+offset 0x800 of the controller) for every SoC; on the A733 it reads
+0x701. There, an AIC8800 USB WLAN on EHCI1 stops within 20-40 s under
+memory load from a second bus master (Xorg with glamor and video, or
+CPU writes plus a Vulkan load): the EHCI interrupts stop while the
+controller keeps running. Without INCR8 the same loads pass: 0xb01
+(INCR16) 3 of 3 runs of 300 s, 0x701 failed 5 of 5; a second board
+shows the same. The vendor kernel sets INCR16 (bit 11) instead of INCR8
+for the A733.
+
+Add an ahb_incr16 flag and an A733 configuration that sets it, otherwise
+equal to the D1 configuration the A733 device tree falls back to. With
+the flag, enabling also clears INCR8 left set by an earlier stage. pmu0
+gets the same value, as in the vendor code; only pmu1 was measured.
+Other SoCs are unchanged.
+
+Link: https://github.com/radxa/allwinner-bsp/blob/dd2a41a23729b7a79ee4ef7d52d2b45f55e6520f/drivers/usb/host/sunxi-hci.c#L1583-L1647
+
+Assisted-by: Claude
+---
+ drivers/phy/allwinner/phy-sun4i-usb.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+index 59d38d88e..f41d7d8ef 100644
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -46,6 +46,7 @@
+ 
+ #define OTGCTL_ROUTE_MUSB		BIT(0)
+ 
++#define SUNXI_AHB_INCR16_EN		BIT(11)
+ #define SUNXI_AHB_ICHR8_EN		BIT(10)
+ #define SUNXI_AHB_INCR4_BURST_EN	BIT(9)
+ #define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
+@@ -106,6 +107,7 @@ struct sun4i_usb_phy_cfg {
+ 	bool needs_phy2_siddq;
+ 	bool siddq_in_base;
+ 	bool poll_vbusen;
++	bool ahb_incr16;
+ 	int missing_phys;
+ };
+ 
+@@ -229,13 +231,20 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+ static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+ {
+ 	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
+-	u32 bits, reg_value;
++	u32 bits, stale = 0, reg_value;
+ 
+ 	if (!phy->pmu)
+ 		return;
+ 
+-	bits = SUNXI_AHB_ICHR8_EN | SUNXI_AHB_INCR4_BURST_EN |
+-		SUNXI_AHB_INCRX_ALIGN_EN | SUNXI_ULPI_BYPASS_EN;
++	bits = SUNXI_AHB_INCR4_BURST_EN | SUNXI_AHB_INCRX_ALIGN_EN |
++		SUNXI_ULPI_BYPASS_EN;
++	if (phy_data->cfg->ahb_incr16) {
++		bits |= SUNXI_AHB_INCR16_EN;
++		/* INCR8 left set by an earlier stage would break the host */
++		stale = SUNXI_AHB_ICHR8_EN;
++	} else {
++		bits |= SUNXI_AHB_ICHR8_EN;
++	}
+ 
+ 	/* A83T USB2 is HSIC */
+ 	if (phy_data->cfg->hsic_index &&
+@@ -246,7 +255,7 @@ static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+ 	reg_value = readl(phy->pmu);
+ 
+ 	if (enable)
+-		reg_value |= bits;
++		reg_value = (reg_value & ~stale) | bits;
+ 	else
+ 		reg_value &= ~bits;
+ 
+@@ -1013,6 +1022,15 @@ static const struct sun4i_usb_phy_cfg sun50i_h616_cfg = {
+ 	.siddq_in_base = true,
+ };
+ 
++static const struct sun4i_usb_phy_cfg sun60i_a733_cfg = {
++	.phyctl_offset = REG_PHYCTL_A33,
++	.dedicated_clocks = true,
++	.hci_phy_ctl_clear = PHY_CTL_SIDDQ,
++	.phy0_dual_route = true,
++	.siddq_in_base = true,
++	.ahb_incr16 = true,
++};
++
+ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
+@@ -1029,6 +1047,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	  .data = &sun50i_a64_cfg},
+ 	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data = &sun50i_h6_cfg },
+ 	{ .compatible = "allwinner,sun50i-h616-usb-phy", .data = &sun50i_h616_cfg },
++	{ .compatible = "allwinner,sun60i-a733-usb-phy", .data = &sun60i_a733_cfg },
+ 	{ .compatible = "allwinner,suniv-f1c100s-usb-phy",
+ 	  .data = &suniv_f1c100s_cfg },
+ 	{ },

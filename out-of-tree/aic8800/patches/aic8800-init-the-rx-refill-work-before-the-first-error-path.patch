@@ -1,55 +1,24 @@
 From: DockSeed <dockseed@proton.me>
 Subject: [PATCH] aic8800: init the rx refill work before the first error path
 
-From code reading (pinned tag plus the preceding patches in patches/series; kernel 6.18.53).
+aicwf_usb_init() in aic_load_fw and aic8800_fdrv jumps to its error label
+on an allocation failure, but initialises rx_urb_work (and msg_rx_urb_work
+in aic8800_fdrv) only at its end. The error path calls aicwf_usb_deinit(),
+which runs cancel_work_sync() on a work item without a function, and
+__flush_work() warns. The msg_out URB branch also sets a positive ENOMEM,
+so probe returns +12 instead of a negative errno.
 
-aicwf_usb_init() in both modules jumps to `error` from each allocation --
-the rx URBs, the tx URBs, the msg-out URB, and in aic8800_fdrv the msg-in rx
-URBs -- but initialises rx_urb_work (and aic8800_fdrv's msg_rx_urb_work)
-only at its end (aic_load_fw aicwf_usb.c:829, aic8800_fdrv :2106-2109 before
-this patch). `error` calls aicwf_usb_deinit(), whose first statement is
-cancel_work_sync() on that work. usb_dev comes from kzalloc(), so the work
-has no func: __cancel_work_sync() -> __flush_work() hits
-WARN_ON(!work->func) (kernel/workqueue.c:4287, 6.18.53). The msg-out branch
-also sets `ret = ENOMEM`, positive, so the probe returns +12 where the
-driver core expects a negative errno.
+Initialise the work items before the first allocation and return -ENOMEM
+from the msg_out URB branch.
 
-Only an allocation failure at probe takes this path. The same code is in all
-eight copies of aicwf_usb.c in the pinned tag (our two and six under
-src/USB/patch/).
-
-Without this patch, the error path cleans up work items the function has not
-initialised yet, and one branch returns the error with a positive sign.
-
-What changes, in both modules: the work items are initialised with the
-anchors, before the first allocation, and the msg-out branch returns
--ENOMEM. Nothing else moves; on a probe that allocates everything the
-order of events is the same.
-
-Test stimulus under /sys/module/<module>/parameters, both modules:
-usb_init_inject_alloc_fail (0644) makes the next aicwf_usb_init() skip one
-allocation and take its failure branch, once: 1 rx URBs, 2 tx URBs,
-3 msg-out URB, 4 msg-in rx URBs (aic8800_fdrv only). What follows is the
-path a real failure takes.
-
-Check, on the board, with the part at its loaded id (a reload after the
-radio came up):
-  modprobe -r aic8800_fdrv aic_load_fw
-  modprobe aic_load_fw usb_init_inject_alloc_fail=3
-Without the fix: a WARNING from __flush_work() and a positive probe
-return; with it: "aicwf_usb_init err -12", no WARNING. The same with
-aic8800_fdrv (values 1-4). One WARNING from __flush_work() on this path
-with the fix refutes it.
-
-HW-proven, 8 GiB board, 2026-09-24 (6.18.53): the stimulus alone gave the
-WARNING (aic_load_fw once, aic8800_fdrv twice, one per work) and probe
-error +12; with this patch, values 1 and 3 (aic_load_fw) and 3 and 4
-(aic8800_fdrv) gave -12 and no WARNING.
+For testing, the module parameter usb_init_inject_alloc_fail (0644) makes
+the next aicwf_usb_init() fail one allocation, once: 1 rx URBs, 2 tx URBs,
+3 msg_out URB, 4 msg-in rx URBs (aic8800_fdrv only).
 
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index 7b6eca0..e7524f9 100644
+index 5f62a7f..b368165 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 @@ -2039,9 +2039,17 @@ static void aicwf_usb_msg_rx_urb_work(struct work_struct *work)
@@ -129,7 +98,7 @@ index 7b6eca0..e7524f9 100644
      error:
      usb_err("failed!\n");
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
-index 8d31a5f..ca98bb3 100644
+index 41702f0..ca943e8 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 @@ -786,9 +786,17 @@ static void aicwf_usb_rx_urb_work(struct work_struct *work)

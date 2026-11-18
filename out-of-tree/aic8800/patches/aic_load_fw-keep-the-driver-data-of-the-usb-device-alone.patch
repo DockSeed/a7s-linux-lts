@@ -1,31 +1,19 @@
 From: DockSeed <dockseed@proton.me>
 Subject: [PATCH] aic_load_fw: keep the driver data of the USB device alone
 
-aic_load_fw is a USB interface driver, but aicwf_usb_probe() stored its bus
-structure in the driver data of the USB device (usb_dev->dev is &usb->dev,
-dev_set_drvdata(dev, bus_if)). The driver data of a USB device belongs to the
-driver bound to the device. With a device tree node on the hub port of the
-module, that is onboard_usb_dev, which keeps its struct onboard_dev there
-(onboard_dev_usbdev_probe(), drivers/usb/misc/onboard_usb_dev.c) and reads it
-back in onboard_dev_usbdev_disconnect().
+aicwf_usb_probe() stores the bus structure in the driver data of the USB
+device, although aic_load_fw is a USB interface driver. That data belongs
+to the driver bound to the device: with a device tree node on the hub
+port, onboard_usb_dev keeps its struct onboard_dev there and reads it in
+onboard_dev_usbdev_disconnect(). aicwf_usb_disconnect() frees the bus
+structure first, so onboard_usb_dev then locks a mutex in freed memory
+(oops right after "aicwf_usb_disconnect enter").
 
-The loader overwrote that pointer on probe. On disconnect the interface is
-unbound first and aicwf_usb_disconnect() frees the bus structure; then
-onboard_dev_usbdev_disconnect() takes the freed memory for its struct
-onboard_dev and locks a mutex in it. Seen on the Radxa Cubie A7S as an oops
-in onboard_dev_usbdev_disconnect() right after "aicwf_usb_disconnect enter"
-in the kernel log.
-
-The bus handle is now the struct device of the USB interface, which is what
-the driver core hands to a USB interface driver. Its driver data already is
-the struct aic_usb_dev (usb_set_intfdata()), and the bus structure is
-reached through usb_dev->bus_if. The bus operations, aicwf_bus_init() and
-aicwf_bus_deinit() and the firmware loader of the Bluetooth part read it
-through aicwf_dev_to_bus() instead of dev_get_drvdata().
-
-usb_dev->dev has no other user in this module: it was only the key for the
-driver data. The firmware is opened by path and request_firmware() gets no
-device, nothing is mapped for DMA and no wiphy parent is set here.
+Use the struct device of the USB interface as bus handle. Its driver data
+is already the struct aic_usb_dev (usb_set_intfdata()), and the new
+helper aicwf_dev_to_bus() reaches the bus structure through it. The bus
+operations, aicwf_bus_init()/aicwf_bus_deinit() and the Bluetooth
+firmware loader use the helper instead of dev_get_drvdata().
 
 Assisted-by: Claude
 

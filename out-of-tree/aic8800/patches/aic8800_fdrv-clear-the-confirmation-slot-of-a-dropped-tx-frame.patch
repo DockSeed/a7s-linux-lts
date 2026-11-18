@@ -1,0 +1,73 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: clear the confirmation slot of a dropped tx
+ frame
+
+A frame that needs a firmware confirmation (management, EAPOL, WAPI) is
+stored in the confirmation ring usb_env.tx_host_id[0][idx] before it
+reaches the bus. aicwf_usb_bus_txdata() drops such a frame and frees its
+skb when the bus is not up, when no tx URB is free, and when a copy
+cannot be allocated, but the ring slot keeps the freed pointer. A
+confirmation for that slot then writes into the freed skb and passes it
+to rwnx_txdatacfm().
+
+Clear the slot in the three drop paths with cmpxchg(), only if it still
+holds this skb, so a slot that was already reused is left alone.
+
+With CONFIG_PER_STA_FC (off in this build) the copy-failure drop leaves
+the per-station pending count raised. A frame whose submit fails in
+aicwf_usb_tx_process() keeps its slot and its sw_txhdr, as before.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index 0c1c50c..1a93c99 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -1810,6 +1810,21 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *pkt)
+ }
+ 
+ #else
++/* A frame that needs a confirmation has its skb in the confirmation ring
++ * (aicwf_usb_host_txdesc_push() in rwnx_tx.c); status_desc_addr holds the
++ * slot. When such a frame is dropped before the firmware sees it, the slot
++ * must not keep the freed skb: a confirmation for that slot would use it.
++ * The slot is cleared only if it still holds this skb.
++ */
++static void aicwf_usb_tx_forget_cfm(struct rwnx_hw *rwnx_hw,
++                                    struct rwnx_txhdr *txhdr, struct sk_buff *skb)
++{
++    u32 idx = txhdr->sw_hdr->desc.host.status_desc_addr & ~(1U << 31);
++
++    cmpxchg(&rwnx_hw->usb_env.tx_host_id[0][idx % USB_TXDESC_CNT],
++            (unsigned long)skb, 0UL);
++}
++
+ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+ {
+     u8 *buf;
+@@ -1833,6 +1848,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+ 
+     if (usb_dev->state != USB_UP_ST) {
+         usb_err("usb state is not up!\n");
++        if (txhdr->sw_hdr->need_cfm)
++            aicwf_usb_tx_forget_cfm(rwnx_hw, txhdr, skb);
+         kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+         dev_kfree_skb_any(skb);
+         return -EIO;
+@@ -1842,6 +1859,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+                         &usb_dev->tx_free_count, &usb_dev->tx_free_lock);
+     if (!usb_buf) {
+         usb_err("free:%d, post:%d\n", usb_dev->tx_free_count, usb_dev->tx_post_count);
++        if (txhdr->sw_hdr->need_cfm)
++            aicwf_usb_tx_forget_cfm(rwnx_hw, txhdr, skb);
+         kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+         dev_kfree_skb_any(skb);
+         ret = -ENOMEM;
+@@ -1982,6 +2001,7 @@ drop:
+      */
+     if (need_cfm) {
+         kfree(buf);
++        aicwf_usb_tx_forget_cfm(rwnx_hw, txhdr, skb);
+         kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+     }
+     dev_kfree_skb_any(skb);

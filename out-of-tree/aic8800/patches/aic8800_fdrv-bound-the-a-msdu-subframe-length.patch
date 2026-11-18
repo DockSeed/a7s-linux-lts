@@ -1,0 +1,81 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: bound the A-MSDU subframe length
+
+rwnx_rxdata_process_amsdu() takes the subframe length from the frame and
+copies sublen - 6 bytes, dropping the 6-byte LLC/SNAP head.
+
+- sublen 0-5 makes sublen - 6 negative, a huge size_t: the memcpy() runs
+  past the buffer and oopses the busrx thread or the reorder worker.
+- A last subframe followed by 1-3 stray bytes rounds up past the end of
+  the skb. skb_pull() then pulls nothing and returns NULL, and the loop
+  reads the same subframe again, allocating a new skb each time.
+- Without an active vif the subframe copy is not freed.
+
+End the split at a subframe shorter than 8 bytes (LLC/SNAP plus
+EtherType) and count it in the new rx_bad_frame_drops parameter. Clamp
+the pull to the bytes left. Free the copy when there is no vif.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index 301db61..e51e8fa 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -70,6 +70,9 @@ MODULE_PARM_DESC(rx_inject_urb_error, "Test stimulus: handle the next N good rx
+ uint rx_bad_len_drops;
+ module_param(rx_bad_len_drops, uint, 0444);
+ MODULE_PARM_DESC(rx_bad_len_drops, "rx aggregates dropped because a header claimed more than the buffer holds");
++uint rx_bad_frame_drops;
++module_param(rx_bad_frame_drops, uint, 0444);
++MODULE_PARM_DESC(rx_bad_frame_drops, "rx frames dropped because a length or index in them is out of range");
+ int rx_inject_bad_len;
+ module_param(rx_inject_bad_len, int, 0644);
+ MODULE_PARM_DESC(rx_inject_bad_len, "Test stimulus: treat the next N rx aggregate headers as too long");
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+index 2664bb6..c5c53fa 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2138,6 +2138,8 @@ void remove_sec_hdr_mgmt_frame(struct hw_rxhdr *hw_rxhdr,struct sk_buff *skb)
+     }
+ }
+ 
++extern uint rx_bad_frame_drops;
++
+ void rwnx_rxdata_process_amsdu(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, u8 vif_idx,
+                                         struct sk_buff_head *list)
+ {
+@@ -2155,6 +2157,13 @@ void rwnx_rxdata_process_amsdu(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, u8
+         sub_skb = NULL;
+         while (skb->len > 16) {
+             sublen = (skb->data[12]<<8)|(skb->data[13]);
++            /* sublen comes from the air. The copy below drops the 6-byte
++             * LLC/SNAP head and keeps the 2-byte EtherType, so a subframe
++             * shorter than 8 bytes would turn sublen - 6 into a huge length. */
++            if (sublen < 8) {
++                rx_bad_frame_drops++;
++                break;
++            }
+             if (skb->len > (sublen+14))
+                 len_alligned = roundup(sublen + 14, 4);
+             else if (skb->len == (sublen+14))
+@@ -2163,6 +2172,11 @@ void rwnx_rxdata_process_amsdu(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, u8
+                 printk("accroding to amsdu: this will not happen\n");
+                 break;
+             }
++            /* Only subframes before the last carry padding. A last
++             * subframe followed by 1-3 stray bytes would round up past the
++             * end; skb_pull() then fails and this loop never ends. */
++            if (len_alligned > skb->len)
++                len_alligned = skb->len;
+             //printk("sublen = %d, %x, %x, %x, %x\r\n", sublen,skb->data[0], skb->data[1], skb->data[12], skb->data[13]);
+ #if 1
+             sub_skb = __dev_alloc_skb(sublen - 6 + 12, GFP_ATOMIC);
+@@ -2178,7 +2192,7 @@ void rwnx_rxdata_process_amsdu(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, u8
+             rwnx_vif = rwnx_rx_get_vif(rwnx_hw, vif_idx);
+             if (!rwnx_vif) {
+                 printk("frame received but no active vif (%d), skb->len:%u\n", vif_idx, skb->len);
+-                //dev_kfree_skb(sub_skb);
++                dev_kfree_skb(sub_skb);
+                 break;
+             }
+             __skb_queue_tail(list, sub_skb);

@@ -65,18 +65,34 @@ The vendor manifest (`src/firmware_version.md`) does not list
 
 ## Patches
 
-Applied in this order (`patches/series`). Each patch carries its own
-explanation in its header.
+Applied in two steps.
+
+**Other projects' patches, unchanged** (`patches/upstream/`, in the order of
+`patches/upstream/series`, which names each author and source). They are
+applied byte for byte as published, with `patch -p1 --fuzz=0`; for a target
+file with CRLF line ends the hunk lines get CRLF at apply time.
+
+- `fix-Lower-the-debugging-log-level` - Feng Zhang (Radxa), from
+  `debian/patches` of the pinned tag: the compiled-in `aicwf_dbg_level` is
+  `LOGERROR`. Its PCIe and SDIO hunks change files this recipe does not build.
+- `bluetooth-fw-upload-fix-chip-mcu-id-needs-cache-mem-addr` - bnister,
+  shenmintao/aic8800d80 pull request 35: on parts reporting an MCU id, bit 0 at
+  `0x40100020` is set before the upload, or BT firmware load fails with `-110`.
+  Applied from `src/USB/driver_fw`. Does not execute on the board
+  (`chip_mcu_id=0`); kept for other parts.
+- `fix-usb-suspend-reboot-hang` - Jiali Chen (Radxa), from `debian/patches` of
+  the pinned tag: a failed bulk-IN completion took a semaphore inside URB
+  completion and left scanning returning `-EBUSY`; the handshake is removed
+  from the completion path.
+
+**Ours** (`patches/series`), made against the tree with the patches above:
 
 1. `compat-build-against-linux-6.18` - the pinned tag guards most kernel API
    changes itself; what remains is `rwnx_cfg80211_get_tx_power()`, which needs
    the 6.18 prototype, plus a few removed timer calls in code that is not
    compiled.
-2. `aic_load_fw-set-cache-bit-before-firmware-upload` - based on the change by
-   bnister (pull request 35 of shenmintao/aic8800d80, merged 2026-03-04): on
-   parts reporting an MCU id, bit 0 at `0x40100020` must be set before upload
-   or BT firmware load fails with `-110`. Does not execute on the board
-   (`chip_mcu_id=0`); kept for other parts.
+2. `aic_load_fw-print-the-cache-address-when-its-read-fails` - the read-failure
+   message of bnister's block prints the address that was read.
 3. `aic_load_fw-match-only-the-vendor-interface` - the loader's table matched
    whole devices, so after download USB probed it on all three interfaces and
    each refusal was logged as an error. It now matches only `ff/ff/ff`, the
@@ -84,69 +100,100 @@ explanation in its header.
 4. `aic_load_fw-track-firmware-upload-per-part` - the "firmware already
    loaded" flag was one module-wide global; it is now kept per part, keyed by
    USB topology path, so two parts do not depend on enumeration order.
-5. `aic8800-lower-the-default-log-level` - `AICWFDBG()` has no `KERN_` prefix,
-   so every debug line printed at warning level (about 40 % of a boot log,
-   including SSIDs). Both modules now default to `LOGERROR`; the level stays
-   adjustable at runtime through `aicwf_dbg_level`. Radxa's package carries the
-   same change in its quilt series, which a plain git checkout does not run;
-   this patch is that change. The rest of the quilt series is not applied:
-   `fix-usb-firmware-path.patch` would move the firmware path away from
-   `/lib/firmware/aic8800D80`, where this image installs the files.
-6. `regulatory-let-cfg80211-govern-the-radio` - the wiphy was self-managed
+5. `regulatory-let-cfg80211-govern-the-radio` - the wiphy was self-managed
    (`custregd` compiled in as true, while the parameter text says the default
    is 0), so `regulatory.db` governed nothing. The default now matches the
    text: `custregd` is opt-in.
-7. `aic8800_fdrv-keep-draining-rx-after-a-bad-aggregate` - after an aggregate
+6. `aic8800_fdrv-keep-draining-rx-after-a-bad-aggregate` - after an aggregate
    header that claims more than the buffer holds, the rx consumer thread was
    not woken again and all rx URBs eventually failed to resubmit; the loop now
    breaks instead of returning with buffers queued.
-8. `aic8800_fdrv-drop-the-disconnect-handshake-from-rx-completion` - a port of
-   Radxa's `fix-usb-suspend-reboot-hang.patch`: a failed bulk-IN completion
-   took a semaphore inside URB completion and left scanning returning
-   `-EBUSY`; the handshake is removed from the completion path.
-9. `aic_load_fw-bound-the-rx-parser-to-the-buffer` - the loader's rx parser and
+7. `aic8800_fdrv-add-a-test-stimulus-for-failed-bulk-in-completions` -
+   `rx_inject_urb_error` handles good bulk-IN completions as `-EPROTO`, to
+   check `fix-usb-suspend-reboot-hang` on the board.
+8. `aic_load_fw-bound-the-rx-parser-to-the-buffer` - the loader's rx parser and
    message dispatch did not bound frame headers against the buffer (endless
    loop with an skb leak, handler-table index, `memcpy` length); every header,
    pull and copy is now bounded.
-10. `aic8800_fdrv-do-not-advertise-monitor-mode` - monitor mode is removed from
-    the supported interface modes: this build compiles the driver without its
-    monitor-data support, the guard in `change_iface()` refuses monitor mode
-    once a second vif exists, and the monitor paths were measured to oops, so
-    a working monitor mode needs a series of its own.
-11. `aic8800_fdrv-print-the-mgmt-tx-status-through-dynamic-debug` - a
+9. `aic8800_fdrv-do-not-advertise-monitor-mode` - monitor mode is removed from
+   the supported interface modes: this build compiles the driver without its
+   monitor-data support, the guard in `change_iface()` refuses monitor mode
+   once a second vif exists, and the monitor paths were measured to oops, so
+   a working monitor mode needs a series of its own.
+10. `aic8800_fdrv-print-the-mgmt-tx-status-through-dynamic-debug` - a
     `trace_printk()` in the management tx-status path made every boot print the
     kernel's DEBUG-kernel notice; it is now `pr_debug()`.
-12. `aic8800-give-the-boot-path-prints-a-log-level` - bare `printk()` lines of
+11. `aic8800-give-the-boot-path-prints-a-log-level` - bare `printk()` lines of
     a normal boot (firmware paths, md5, upload progress) all came out at warn;
     they now have meaningful levels, text unchanged.
-13. `aic_load_fw-no-rx-refill-after-the-bus-has-stopped` - a pending rx refill
+12. `aic_load_fw-no-rx-refill-after-the-bus-has-stopped` - a pending rx refill
     could run after the post-download bus stop and log `bus is not up` at error
     level on a working radio; the work is cancelled after the stop.
-14. `aic8800-init-the-rx-refill-work-before-the-first-error-path` - a failed
+13. `aic8800-init-the-rx-refill-work-before-the-first-error-path` - a failed
     allocation in probe cancelled a work item that was never initialised;
     initialised first now, and `-ENOMEM` is returned as a negative errno.
-15. `aic_load_fw-no-rx-urb-in-flight-after-the-bus-stop` - closes the remaining
+14. `aic_load_fw-no-rx-urb-in-flight-after-the-bus-stop` - closes the remaining
     race where a refill submits an rx URB after the stop killed them and the
     error path frees the device under it.
-16. `aic_load_fw-return-an-errno-from-a-failed-configuration-or-upload` - a
+15. `aic_load_fw-return-an-errno-from-a-failed-configuration-or-upload` - a
     failed configuration or firmware upload returned 0 from probe, leaving the
     interface "bound" and the radio dead until re-plug.
-17. `aic_load_fw-a-timed-out-firmware-message-fails-and-is-freed` - a timed-out
+16. `aic_load_fw-a-timed-out-firmware-message-fails-and-is-freed` - a timed-out
     firmware message was reported as confirmed, leaked the command, and a killed
     wait freed it while still on the list; it now returns `-ETIMEDOUT`.
-18. `aic8800_fdrv-count-received-data-frames-in-the-interface-statistics` -
+17. `aic8800_fdrv-count-received-data-frames-in-the-interface-statistics` -
     `rx_packets`/`rx_bytes` were only counted under `CONFIG_BR_SUPPORT`
     (disabled), so a station's receive counters did not follow its traffic.
-19. `aic_load_fw-keep-the-driver-data-of-the-usb-device-alone` - the loader
+18. `aic_load_fw-keep-the-driver-data-of-the-usb-device-alone` - the loader
     is a USB interface driver but kept its bus structure in the driver data of
     the USB device, which belongs to the driver bound to the device. With a
     device tree node on the hub port that is `onboard_usb_dev`, whose
     disconnect then took the freed bus structure for its own state. The bus
     handle is now the interface and the bus structure is reached through the
     interface's driver data.
-20. `aic8800_fdrv-keep-the-driver-data-of-the-usb-device-alone` - the same
+19. `aic8800_fdrv-keep-the-driver-data-of-the-usb-device-alone` - the same
     for the WiFi module. The parent of the wiphy, the firmware-request and DMA
     device and the wakeup sources stay on the USB device.
+20. `aic8800_fdrv-bound-the-a-msdu-subframe-length` - an A-MSDU subframe shorter
+    than its LLC/SNAP head or past the frame ends the split.
+21. `aic8800_fdrv-bound-the-message-dispatch-to-the-handler-tables` - messages
+    without a handler slot are counted (`rx_unknown_msgs`), not called.
+22. `aic8800_fdrv-check-whole-rx-frames-and-messages-against-what-was-received`
+    - every rx frame and message must fit in what was received.
+23. `aic8800_fdrv-drop-rx-frames-whose-station-index-is-out-of-range` - data
+    frames with a station index past `sta_table[]` are dropped.
+24. `aic8800_fdrv-keep-qos-tids-8-15-out-of-the-rx-reorder` - QoS TIDs 8-15
+    bypass the host reorder, which has state for 0-7.
+25. `aic8800_fdrv-read-the-a-msdu-flag-before-the-split-frees-the-frame` - the
+    A-MSDU flag is read before the split frees the frame.
+26. `aic8800_fdrv-bound-the-firmware-assert-text-to-its-buffer` - the firmware
+    assert text is bounded to its buffer.
+27. `aic8800_fdrv-check-firmware-table-indexes-in-the-message-handlers` -
+    interface and station indexes in firmware messages are checked.
+28. `aic8800_fdrv-bound-the-scan-result-frame-to-its-message` - a scan result
+    frame must fit in its message.
+29. `aic8800_fdrv-bound-the-association-ie-lengths-to-their-buffer` -
+    association IE lengths must fit in `assoc_ie_buf`.
+30. `aic_load_fw-no-busy-wait-under-the-rx-pool-lock` - no `mdelay(10)` under
+    the rx pool lock.
+31. `aic8800_fdrv-retry-a-failed-rx-submit-later-instead-of-mdelay-100` - a
+    failed rx submit is retried 100 ms later from process context.
+32. `aic8800_fdrv-end-the-msg-in-refill-loop-when-a-submit-fails` - the msg-in
+    refill loop ends on a failed submit.
+33. `aic8800_fdrv-re-arm-the-bulk-in-urbs-after-a-transfer-error` - bulk-in URBs
+    are re-armed after a transient transfer error.
+34. `aic8800_fdrv-free-an-unsent-tx-frame-by-its-type-drop-it-on-copy-failure` -
+    an unsent tx frame is freed by its type; a failed copy drops it.
+35. `aic8800_fdrv-let-a-tx-frame-skip-the-tcp-ack-filter-if-allocation-fails` -
+    a small tx frame skips the TCP ACK filter if its allocation fails.
+36. `aic8800_fdrv-make-rx-defragmentation-safe-against-long-fragments-timeout` -
+    rx defragmentation: atomic allocations, bounded fragments, safe timeout.
+37. `aic8800_fdrv-free-a-msg-in-frame-whose-copy-cannot-be-allocated` - a msg-in
+    frame whose copy fails is freed.
+38. `aic8800_fdrv-clear-the-confirmation-slot-of-a-dropped-tx-frame` - a dropped
+    tx frame clears its confirmation slot.
+
+New counters of 20-38: `rx_bad_frame_drops`, `rx_unknown_msgs` (both 0444).
 
 Several patches add small module parameters or counters under
 `/sys/module/<module>/parameters/` to inject the failure they fix; they are
@@ -156,7 +203,15 @@ described in the patch headers.
 
 The WLAN/BT driver is built by the image recipe from its pinned source and is
 not part of the releases of this repository. Our patches are GPL-2.0-only,
-matching the code they modify.
+matching the code they modify; the patches in `patches/upstream/` keep the terms
+of their projects.
+
+The vendor source files carry no licence text. Radxa's `debian/copyright`
+states GPL-2 for `src/`, and both modules declare `MODULE_LICENSE("GPL")`.
+`aic_br_ext.c`/`.h` (Apache-2.0) are not built (`CONFIG_BR_SUPPORT = n`).
+`rwnx_radar.c`, which is built, states that it is adapted from the ath driver
+(Neratec Solutions AG); that code is ISC-licensed in the kernel. The firmware
+has no licence and is not part of this recipe.
 
 ## Bumping the pin
 

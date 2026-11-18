@@ -1,77 +1,17 @@
 From: DockSeed <dockseed@proton.me>
 Subject: [PATCH] aic8800: give the boot-path prints a log level
 
-Measured on the board, 2026-09-17, a normal boot
-(`dmesg` err/warn section): 67 lines from aic_load_fw and aic8800_fdrv sit at
-KERN_WARNING on every boot, and none of them reports a fault. 63 are bare
-printk() with no KERN_ level, which the kernel emits at the default message
-level, 4 = KERN_WARNING (the chain is in the header of aic8800-lower-the-default-log-level). The other 4 are
-AICWFDBG(LOGERROR, ...) for values that are not errors. That patch's own
-observable reads correctly on the same boot: no AICWFDBG(LOGINFO) line at
-all, so the SSID call sites (all LOGINFO or LOGDEBUG) stay quiet.
+A normal boot prints 67 lines from aic_load_fw and aic8800_fdrv at
+KERN_WARNING although none reports a failure. 63 are bare printk() calls,
+which use the default message level, and 4 are AICWFDBG(LOGERROR, ...)
+for values that are not errors. "journalctl -p warning" therefore cannot
+separate a failed radio from a working one.
 
-Progress chatter and identity lines share one level with real failures, so
-`journalctl -p warning` cannot tell a dead radio from a working one; and
-LOGERROR, the one gate bit that stays on, is used for a firmware memory readout
-and the P2P device address.
-
-What changes, by the line in that log. No message text changes, no line is
-deleted:
-
-  pr_info (identity and proof lines, still in dmesg by default)
-    aic_load_fw  RELEASE DATE (aic_bluetooth_main.c)          1
-                 Aic <speed> speed USB device detected         1
-                 chip_id=, chip_mcu_id = (aic_compat_8800d80.c) 1
-                 aic_load_firmware :firmware path =            5
-                 file md5: (the pinned-hash proof, README)     5
-                 ### Upload ... firmware / fw_patch_table      5
-                 fw download complete                          4
-                 patch version                                 1
-                 aicwf_usb_disconnect enter                    1
-  pr_debug (progress chatter, on with dynamic debug)
-    aic_load_fw  aic_bluetooth_mod_init                        1
-                 addr_adid ..., addr_patch ...                 1
-                 aicbt_patch_table_load bt <6 values>          6
-                 app_cmp (aicwf_usb_rx_submit_all_urb)        20
-                 aicwf_bus_deinit / exit aicwf_bus_deinit      2
-                 q_sz/max (cmd_mgr_print)                      2
-                 usb bustx/busrx thread will to stop / stop    4
-    aic8800_fdrv ========== tcp ack debug tcp_ack_init         1
-                 rx eapol (rwnx_rxdataind_aicwf)               2
-  AICWFDBG LOGERROR -> LOGINFO
-    aic_load_fw  Read FW mem: and its two addr=value lines     3
-    aic8800_fdrv p2p dev addr=                                 1
-
-Only lines that a normal boot and association print were touched. The
-failure prints next to them (rd fail, upload fail, file failed to open,
-wrong size) keep their bare printk and so stay at KERN_WARNING, and so does
-rwnx_send_reboot's "enter" line. Radxa's own fix-Lower-the-debugging-log-level.patch does
-not reach any of these lines.
-
-Switching the quiet lines back on, no rebuild (CONFIG_DYNAMIC_DEBUG is
-asserted in pins/kernel-config.assert), scoped by function:
-  echo 'module aic_load_fw func aicbt_patch_table_load +p' \
-    > /sys/kernel/debug/dynamic_debug/control
-  aic_load_fw.dyndbg="func aicwf_usb_rx_submit_all_urb +p"   (command line)
-The four LOGINFO lines print at firmware upload and interface creation, so
-their gate has to be open at module load, and each module has its own:
-  aic_load_fw.aicwf_dbg_level=3 aic8800_fdrv.aicwf_dbg_level=3  (command line)
-or the same as `options` lines in modprobe.d. LOGINFO also opens the SSID
-call sites, so such a log needs redacting before it is shared.
-
-aicwf_usb_disconnect enter stays at pr_info on purpose: it is the one line
-from this driver when the radio leaves the bus, expected or not (it prints
-once per boot at the firmware re-enumeration). The bus-deinit and thread-stop
-lines that follow it go to pr_debug.
-
-Check, on the board after a normal boot with WLAN associated:
-1. `journalctl -k -b -p warning` holds no line from either module (compare
-   the 67 in the log above).
-2. `journalctl -k -b -p info` still holds the firmware path, md5, Upload
-   and patch version lines, one set per boot.
-3. The dyndbg line for aicbt_patch_table_load, then a reload of the loader,
-   prints the six bt values.
-4. WLAN associates and Bluetooth comes up as before (hci0 UP RUNNING).
+Change the identity and proof lines (RELEASE DATE, chip_id, firmware path,
+file md5, upload and patch version, aicwf_usb_disconnect) to pr_info(),
+the progress lines to pr_debug(), and the four LOGERROR prints (Read FW
+mem, p2p dev addr) to LOGINFO. No message text changes. The failure
+prints keep their level.
 
 Assisted-by: Claude
 
@@ -284,7 +224,7 @@ index 48bb8c8..223cfc8 100644
               cmd_mgr->next_tkn);
      list_for_each_entry(cur, &cmd_mgr->cmds, list) {
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
-index d0b7f75..c43fd3f 100644
+index 60695e2..e8d6425 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 @@ -312,7 +312,7 @@ static void aicwf_usb_rx_submit_all_urb(struct aic_usb_dev *usb_dev)

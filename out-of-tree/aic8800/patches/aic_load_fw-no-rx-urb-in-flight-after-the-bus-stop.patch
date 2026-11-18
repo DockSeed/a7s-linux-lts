@@ -1,64 +1,24 @@
 From: DockSeed <dockseed@proton.me>
 Subject: [PATCH] aic_load_fw: no rx URB in flight after the bus stop
 
-From code reading (pinned tag plus the preceding patches in patches/series; kernel 6.18.53).
+A rx completion between the cancel and the state change in
+aicwf_usb_bus_stop() still sees USB_UP_ST and queues a refill. That
+refill can pass its state checks, sleep in __dev_alloc_skb(GFP_KERNEL)
+while the stop kills the anchored URBs, and then submit a new URB. On
+the probe error path out_free frees usb_dev with that URB in flight, and
+its completion runs on freed memory.
 
-aicwf_usb_bus_stop() (as changed by aic_load_fw-no-rx-refill-after-the-bus-has-stopped) cancels a pending refill, sets USB_DOWN_ST
-and kills the anchored rx URBs (aicwf_usb.c:767-770 after aic8800-init-the-rx-refill-work-before-the-first-error-path). A
-completion that lands between the cancel and the state change still sees
-USB_UP_ST and queues a refill (:231-237, :280). That refill can pass both
-state checks (:336, :296) before the state change, sleep in
-__dev_alloc_skb(GFP_KERNEL) (:302) while the stop kills the anchor, and
-anchor and submit afterwards (:317, :319). On the disconnect path no URB
-completes there (see the header of that patch). On the probe's error path (a failed
-configuration or upload, :1892, :1896) the part is still on the bus,
-out_free frees usb_dev with that URB in flight (:1913), and its completion
-runs on freed memory.
+After the kill, cancel the work once more (this waits for a running
+refill) and kill the anchor once more. After the state change no
+completion queues a refill.
 
-Without this patch, the stop kills the rx URBs once, and the refill work,
-which checks the state and then submits, is not ordered against the stop.
-
-What changes: after the kill, the stop cancels the work once more, which
-waits for a refill that is still running, and kills the anchor once more.
-After the state change nothing queues a refill (every completion sees
-USB_DOWN_ST), and usb_kill_anchored_urbs() returns only when no
-completion of an anchored URB is running: the core counts
-suspend_wakeups around ->complete() (drivers/usb/core/hcd.c:1648-1664) and
-the kill waits for that count (drivers/usb/core/urb.c:813-836). So after
-the second kill no rx URB is in flight and no refill is pending. The
-refill that straddles the change still prints "usb state is not up!" and
-"usb rx refill fail" for its next buffer; that is the state it finds.
-
-The first cancel stays before the state change, as in
-aic_load_fw-no-rx-refill-after-the-bus-has-stopped, so that a pending refill
-does not run and print. The submit path sleeps (GFP_KERNEL, and msleep(100)
-after a failed submit, :326), so a lock over check and submit is not used.
-
-Test stimulus and counters under /sys/module/aic_load_fw/parameters:
-rx_loader_inject_stop_race (0644): the next N probes take the error path of
-a failed configuration right after the bus start, with the part on the bus
-and its rx URBs live. Their stop kills one rx URB while the bus is up, so
-that its completion queues the refill, holds that refill after both state
-checks, lets it go once the stop has killed the anchor, and then counts
-rx_loader_urb_after_stop (0444) if an rx URB is still in flight -- and kills
-it, so the stimulus itself never frees usb_dev under a live URB.
-rx_loader_stop_race_missed (0444) counts runs whose refill never reached the
-hold point.
-
-Check, on the board, with the part at its loaded id:
-  modprobe -r aic8800_fdrv aic_load_fw
-  modprobe aic_load_fw rx_loader_inject_stop_race=1
-Without the fix: rx_loader_urb_after_stop 1 per run; with it: 0, and
-rx_loader_stop_race_missed 0. One count with the fix refutes it.
-
-HW-proven, 8 GiB board, 2026-09-24 (6.18.53): three runs each; the stimulus
-alone left an rx URB in flight after the stop every time, with this patch
-none, and the refill held on every run of both.
+New parameters: rx_loader_inject_stop_race (0644, stimulus),
+rx_loader_urb_after_stop and rx_loader_stop_race_missed (0444).
 
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
-index ca98bb3..3899334 100644
+index ca943e8..8a2f07f 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_usb.c
 @@ -220,6 +220,35 @@ MODULE_PARM_DESC(rx_loader_refill_skipped, "rx completions on a stopped bus that

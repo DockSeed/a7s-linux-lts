@@ -1,0 +1,108 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: retry a failed rx submit later instead of
+ mdelay(100)
+
+When usb_submit_urb() fails for a bulk-in data URB,
+aicwf_usb_submit_rx_urb() puts the buffer back and busy-waits with
+mdelay(100) in the host controller's bottom half, which blocks that CPU's
+USB completions. The wait retries nothing: the URB stays on rx_free_list
+until another rx URB completes. If none is in flight, nothing submits it
+again.
+
+Replace the mdelay(100) with the delayed work rx_refill_retry, which runs
+aicwf_usb_rx_submit_all_urb() 100 ms later in process context. It is
+scheduled only for -ENOMEM and -EAGAIN and only while the bus is up.
+aicwf_usb_bus_stop() and aicwf_usb_deinit() cancel it.
+
+Only the prealloc branch changes; the skb branch keeps its mdelay(100).
+aic_load_fw is not changed.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index f77141d..a6e2384 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -305,6 +305,19 @@ static void aicwf_usb_tx_complete(struct urb *urb)
+     spin_unlock_irqrestore(&usb_dev->tx_flow_lock, flags);
+ }
+ 
++/* A refill that cannot be submitted now is tried again later from process
++ * context (aicwf_usb_rx_refill_retry()), not by busy-waiting in the
++ * completion that asked for it.
++ */
++#define AICWF_USB_RX_RETRY_MS 100
++
++static inline void aicwf_usb_rx_retry_later(struct aic_usb_dev *usb_dev)
++{
++    if (usb_dev->state == USB_UP_ST)
++        schedule_delayed_work(&usb_dev->rx_refill_retry,
++                              msecs_to_jiffies(AICWF_USB_RX_RETRY_MS));
++}
++
+ void aicwf_usb_rx_submit_all_urb_(struct aic_usb_dev *usb_dev);
+ 
+ #ifdef CONFIG_PREALLOC_RX_SKB
+@@ -814,7 +827,8 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
+         aicwf_prealloc_rxbuff_free(rx_buff, &usb_dev->rx_priv->rxbuff_lock);
+         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
+ 
+-        mdelay(100);
++        if (ret == -ENOMEM || ret == -EAGAIN)
++            aicwf_usb_rx_retry_later(usb_dev);
+ 	    return -1;
+     }else{
+     	atomic_inc(&rx_urb_cnt);
+@@ -2010,6 +2024,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
+     if (usb_dev->state == USB_DOWN_ST)
+         return;
+ 
++    cancel_delayed_work_sync(&usb_dev->rx_refill_retry);
+     aicwf_usb_state_change(usb_dev, USB_DOWN_ST);
+     //aicwf_usb_cancel_all_urbs(usb_dev);//AIDEN
+ }
+@@ -2017,6 +2032,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
+ static void aicwf_usb_deinit(struct aic_usb_dev *usbdev)
+ {
+     cancel_work_sync(&usbdev->rx_urb_work);
++    cancel_delayed_work_sync(&usbdev->rx_refill_retry);
+     aicwf_usb_free_urb(&usbdev->rx_free_list, &usbdev->rx_free_lock);
+     aicwf_usb_free_urb(&usbdev->tx_free_list, &usbdev->tx_free_lock);
+ #ifdef CONFIG_USB_MSG_IN_EP
+@@ -2036,6 +2052,16 @@ static void aicwf_usb_rx_urb_work(struct work_struct *work)
+     aicwf_usb_rx_submit_all_urb(usb_dev);
+ }
+ 
++static void aicwf_usb_rx_refill_retry(struct work_struct *work)
++{
++    struct aic_usb_dev *usb_dev = container_of(to_delayed_work(work),
++                                               struct aic_usb_dev, rx_refill_retry);
++
++    if (usb_dev->state != USB_UP_ST)
++        return;
++    aicwf_usb_rx_submit_all_urb(usb_dev);
++}
++
+ #ifdef CONFIG_USB_MSG_IN_EP
+ static void aicwf_usb_msg_rx_urb_work(struct work_struct *work)
+ {
+@@ -2069,6 +2095,7 @@ static int aicwf_usb_init(struct aic_usb_dev *usb_dev)
+ #endif
+     /* Before the first `goto error`: aicwf_usb_deinit() cancels these works. */
+     INIT_WORK(&usb_dev->rx_urb_work, aicwf_usb_rx_urb_work);
++    INIT_DELAYED_WORK(&usb_dev->rx_refill_retry, aicwf_usb_rx_refill_retry);
+ #ifdef CONFIG_USB_MSG_IN_EP
+ 	if(usb_dev->msg_in_pipe){
+ 		INIT_WORK(&usb_dev->msg_rx_urb_work, aicwf_usb_msg_rx_urb_work);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
+index 7353999..ae385c0 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
+@@ -128,6 +128,7 @@ struct aic_usb_dev {
+ 
+     struct usb_anchor rx_submitted;
+     struct work_struct rx_urb_work;
++    struct delayed_work rx_refill_retry;
+ #ifdef CONFIG_USB_MSG_IN_EP
+ 	struct usb_anchor msg_rx_submitted;
+ 	struct work_struct msg_rx_urb_work;

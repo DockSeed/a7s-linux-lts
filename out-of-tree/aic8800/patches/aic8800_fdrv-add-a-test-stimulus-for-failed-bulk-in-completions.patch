@@ -1,0 +1,41 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: add a test stimulus for failed bulk-IN
+ completions
+
+The handling of a failed bulk-IN transfer in aicwf_usb_rx_complete()
+cannot be exercised without a real USB error.
+
+Add the module parameter rx_inject_urb_error (0644). The next N good
+bulk-IN completions are handled as if they had completed with -EPROTO and
+are counted in rx_urb_errors. A failed URB is re-armed by the next good
+completion, so injecting on all 20 rx URBs at once stops rx until the bus
+restarts.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index 7c6f940..5f62a7f 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -64,6 +64,9 @@ MODULE_PARM_DESC(rx_urb_errors, "Bulk-IN rx URBs that completed with an error");
+ static int rx_urb_last_status;
+ module_param(rx_urb_last_status, int, 0444);
+ MODULE_PARM_DESC(rx_urb_last_status, "urb->status of the last failed bulk-IN rx URB");
++static int rx_inject_urb_error;
++module_param(rx_inject_urb_error, int, 0644);
++MODULE_PARM_DESC(rx_inject_urb_error, "Test stimulus: handle the next N good rx completions as -EPROTO");
+ uint rx_bad_len_drops;
+ module_param(rx_bad_len_drops, uint, 0444);
+ MODULE_PARM_DESC(rx_bad_len_drops, "rx aggregates dropped because a header claimed more than the buffer holds");
+@@ -310,6 +313,11 @@ static void aicwf_usb_rx_complete(struct urb *urb)
+     rx_buff = usb_buf->rx_buff;
+     usb_buf->rx_buff = NULL;
+ 
++    if (unlikely(rx_inject_urb_error > 0) && urb->status == 0) {
++        rx_inject_urb_error--;
++        urb->status = -EPROTO;
++    }
++
+     atomic_dec(&rx_urb_cnt);
+     if(atomic_read(&rx_urb_cnt) < 10){
+         AICWFDBG(LOGDEBUG, "%s %d \r\n", __func__, atomic_read(&rx_urb_cnt));

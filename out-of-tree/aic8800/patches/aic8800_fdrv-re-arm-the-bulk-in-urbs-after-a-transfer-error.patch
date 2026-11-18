@@ -1,0 +1,77 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: re-arm the bulk-in URBs after a transfer error
+
+A data or msg-in URB that completes with a negative status goes back to
+its free list and is submitted again only when another URB of the same
+kind completes successfully. If all fail first, data rx stops
+(rx_urbs_in_flight 0) or the msg-in channel stops and commands time out.
+Also, when the msg-in queue is full, aicwf_usb_msg_rx_complete() frees
+the skb but neither returns the buffer nor submits, losing one URB each
+time.
+
+For -EPROTO, -EILSEQ, -ETIME, -EOVERFLOW, -ENOSR and -ECOMM both
+completions schedule rx_refill_retry. -ENOENT, -ECONNRESET, -ESHUTDOWN
+and -EPIPE schedule nothing. A full msg-in queue returns the buffer and
+refills, like the data path. rx_urb_errors and rx_urb_last_status count
+as before.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index 6b593af..ed79eff 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -318,6 +318,26 @@ static inline void aicwf_usb_rx_retry_later(struct aic_usb_dev *usb_dev)
+                               msecs_to_jiffies(AICWF_USB_RX_RETRY_MS));
+ }
+ 
++/* Completion statuses after which the device and the endpoint are still
++ * there, so a new bulk-in URB can succeed: transaction, CRC/bit-stuff,
++ * timeout, babble and host-controller buffer errors. Unlink, kill,
++ * shutdown and a stall are not among them.
++ */
++static inline bool aicwf_usb_rx_status_transient(int status)
++{
++    switch (status) {
++    case -EPROTO:
++    case -EILSEQ:
++    case -ETIME:
++    case -EOVERFLOW:
++    case -ENOSR:
++    case -ECOMM:
++        return true;
++    default:
++        return false;
++    }
++}
++
+ void aicwf_usb_rx_submit_all_urb_(struct aic_usb_dev *usb_dev);
+ 
+ #ifdef CONFIG_PREALLOC_RX_SKB
+@@ -364,6 +384,8 @@ static void aicwf_usb_rx_complete(struct urb *urb)
+             AICWFDBG(LOGDEBUG, "%s urb->status:%d \r\n", __func__, urb->status);
+             rx_urb_errors++;
+             rx_urb_last_status = urb->status;
++            if (aicwf_usb_rx_status_transient(urb->status))
++                aicwf_usb_rx_retry_later(usb_dev);
+             return;
+         }else{
+             //schedule_work(&usb_dev->rx_urb_work);
+@@ -648,6 +670,8 @@ static void aicwf_usb_msg_rx_complete(struct urb *urb)
+ 
+ 		if(urb->status < 0){
+ 			AICWFDBG(LOGDEBUG, "%s urb->status:%d \r\n", __func__, urb->status);
++			if (aicwf_usb_rx_status_transient(urb->status))
++				aicwf_usb_rx_retry_later(usb_dev);
+ 			return;
+ 		}else{
+ 			aicwf_usb_msg_rx_submit_all_urb_(usb_dev);
+@@ -767,6 +791,8 @@ static void aicwf_usb_msg_rx_complete(struct urb *urb)
+             spin_unlock_irqrestore(&rx_priv->msg_rxqlock, flags);
+             usb_err("rx_priv->rxq is over flow!!!\n");
+             aicwf_dev_skb_free(skb);
++            aicwf_usb_msg_rx_buf_put(usb_dev, usb_buf);
++            aicwf_usb_msg_rx_submit_all_urb_(usb_dev);
+             return;
+         }
+         spin_unlock_irqrestore(&rx_priv->msg_rxqlock, flags);

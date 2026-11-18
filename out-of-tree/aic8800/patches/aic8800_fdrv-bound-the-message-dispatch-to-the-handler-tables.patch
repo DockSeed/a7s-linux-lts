@@ -1,0 +1,102 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: bound the message dispatch to the handler
+ tables
+
+rwnx_rx_handle_msg() looks up the handler as
+msg_hdlrs[MSG_T(id)][MSG_I(id)] without checking either value. MSG_T()
+is 0-63 and MSG_I() 0-1023.
+
+- msg_hdlrs[] has 10 slots, and TASK_SCAN and TASK_BAM are NULL, so a
+  message for them reads through a NULL pointer.
+- A task from 10 up reads past msg_hdlrs[], and cmd_mgr_run_callback()
+  calls the value read as a function.
+- An index past its task table reads the next table.
+
+Give each task table its length and check task and index against it. A
+message without a slot counts in the new rx_unknown_msgs parameter and
+is still passed to msgind() without a handler, so a command waiting for
+that id completes as before.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index e51e8fa..f77141d 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -73,6 +73,9 @@ MODULE_PARM_DESC(rx_bad_len_drops, "rx aggregates dropped because a header claim
+ uint rx_bad_frame_drops;
+ module_param(rx_bad_frame_drops, uint, 0444);
+ MODULE_PARM_DESC(rx_bad_frame_drops, "rx frames dropped because a length or index in them is out of range");
++uint rx_unknown_msgs;
++module_param(rx_unknown_msgs, uint, 0444);
++MODULE_PARM_DESC(rx_unknown_msgs, "firmware messages whose id has no handler slot");
+ int rx_inject_bad_len;
+ module_param(rx_inject_bad_len, int, 0644);
+ MODULE_PARM_DESC(rx_inject_bad_len, "Test stimulus: treat the next N rx aggregate headers as too long");
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index b02a116..e8d8451 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -1714,19 +1714,29 @@ static msg_cb_fct tdls_hdlrs[MSG_I(TDLS_MAX)] = {
+     [MSG_I(TDLS_PEER_PS_IND)] = rwnx_rx_tdls_peer_ps_ind,
+ };
+ 
+-static msg_cb_fct *msg_hdlrs[] = {
+-    [TASK_MM]    = mm_hdlrs,
+-    [TASK_DBG]   = dbg_hdlrs,
++/* Each task table with its length: MSG_I() is checked against the table
++ * it indexes, not against the largest one. */
++struct rwnx_msg_hdlrs {
++    msg_cb_fct *hdlrs;
++    unsigned int n;
++};
++#define RWNX_MSG_HDLRS(t) { .hdlrs = (t), .n = ARRAY_SIZE(t) }
++
++static const struct rwnx_msg_hdlrs msg_hdlrs[] = {
++    [TASK_MM]    = RWNX_MSG_HDLRS(mm_hdlrs),
++    [TASK_DBG]   = RWNX_MSG_HDLRS(dbg_hdlrs),
+ #ifdef CONFIG_RWNX_FULLMAC
+-    [TASK_TDLS]  = tdls_hdlrs,
+-    [TASK_SCANU] = scan_hdlrs,
+-    [TASK_ME]    = me_hdlrs,
+-    [TASK_SM]    = sm_hdlrs,
+-    [TASK_APM]   = apm_hdlrs,
+-    [TASK_MESH]  = mesh_hdlrs,
++    [TASK_TDLS]  = RWNX_MSG_HDLRS(tdls_hdlrs),
++    [TASK_SCANU] = RWNX_MSG_HDLRS(scan_hdlrs),
++    [TASK_ME]    = RWNX_MSG_HDLRS(me_hdlrs),
++    [TASK_SM]    = RWNX_MSG_HDLRS(sm_hdlrs),
++    [TASK_APM]   = RWNX_MSG_HDLRS(apm_hdlrs),
++    [TASK_MESH]  = RWNX_MSG_HDLRS(mesh_hdlrs),
+ #endif /* CONFIG_RWNX_FULLMAC */
+ };
+ 
++extern uint rx_unknown_msgs;
++
+ /**
+  *
+  */
+@@ -1737,9 +1747,20 @@ void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
+ 	//	MSG_T(msg->id), 
+ 	//	MSG_I(msg->id),
+ 	//	rwnx_id2str[MSG_T(msg->id)][MSG_I(msg->id)]);
+-	
+-    rwnx_hw->cmd_mgr->msgind(rwnx_hw->cmd_mgr, msg,
+-                            msg_hdlrs[MSG_T(msg->id)][MSG_I(msg->id)]);
++    unsigned int task = MSG_T(msg->id);
++    unsigned int idx = MSG_I(msg->id);
++    msg_cb_fct cb = NULL;
++
++    /* msg->id comes from the device: only an existing handler slot is
++     * called. A message without one still goes to msgind(), so a command
++     * waiting for that id completes. */
++    if (task < ARRAY_SIZE(msg_hdlrs) && msg_hdlrs[task].hdlrs &&
++        idx < msg_hdlrs[task].n)
++        cb = msg_hdlrs[task].hdlrs[idx];
++    else
++        rx_unknown_msgs++;
++
++    rwnx_hw->cmd_mgr->msgind(rwnx_hw->cmd_mgr, msg, cb);
+ }
+ 
+ void rwnx_rx_handle_print(struct rwnx_hw *rwnx_hw, u8 *msg, u32 len)

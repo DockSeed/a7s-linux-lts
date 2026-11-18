@@ -1,0 +1,54 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: keep QoS TIDs 8-15 out of the rx reorder
+
+rwnx_rxdataind_aicwf() takes the TID from the 4-bit QoS control field
+(0-15). reord_process_unit() and reord_flush_tid() index
+reord_info->preorder_ctrl[tid] with it, but the array has 8 entries. A
+QoS data frame with TID 8-15 makes reord_process_unit() use a lock, list
+and timer past the station's reorder info.
+
+Set is_qos only for TIDs that have reorder state, so frames with TID
+8-15 bypass the host reorder and are passed on in arrival order. The
+array size gets the name AICWF_REORD_TIDS.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h
+index caa139e..c6ed3c1 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.h
+@@ -32,6 +32,8 @@
+ 
+ #define RX_HWHRD_LEN                60 //58->60 word allined
+ #define CCMP_OR_WEP_INFO            8
++/* TIDs 0-7 have reorder state; 8-15 (TSPEC streams) bypass the reorder. */
++#define AICWF_REORD_TIDS            8
+ #define MAX_RXQLEN                  2000
+ #define RX_ALIGNMENT                4
+ 
+@@ -174,7 +176,7 @@ struct reord_ctrl {
+ 
+ struct reord_ctrl_info {
+     u8 mac_addr[6];
+-    struct reord_ctrl preorder_ctrl[8];
++    struct reord_ctrl preorder_ctrl[AICWF_REORD_TIDS];
+     struct list_head list;
+ };
+ 
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+index a3084a5..572d370 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2455,7 +2455,11 @@ check_len_update:
+ #else
+ 				tid = skb->data[24] & 0x0F;
+ #endif
+-				is_qos = 1;
++				/* The QoS TID is 4 bits from the air, the host reorder
++				 * keeps state for TIDs 0-7 only (preorder_ctrl[]). Frames
++				 * of TIDs 8-15 are passed on as they come, without the
++				 * reorder, instead of indexing past preorder_ctrl[]. */
++				is_qos = tid < AICWF_REORD_TIDS;
+ #ifdef CONFIG_SUPPORT_4ADDR
+ 				if (b_4addr) {
+ 					if (skb->data[30] & 0x80)

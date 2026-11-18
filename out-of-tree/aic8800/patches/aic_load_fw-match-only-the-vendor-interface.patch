@@ -1,61 +1,20 @@
 From: DockSeed <dockseed@proton.me>
-Subject: [PATCH] aic_load_fw: match only the vendor interface, and decline with -ENODEV
+Subject: [PATCH] aic_load_fw: match only the vendor interface, and decline
+ with -ENODEV
 
-Two details, one symptom. On every boot of the image the kernel logs
+aicwf_usb_id_table uses USB_DEVICE(), which matches every interface of
+the device. After the firmware upload the part re-enumerates as
+a69c:8d81 with two Bluetooth interfaces (e0/01/01, bound by btusb) and
+one vendor interface (ff/ff/ff). The loader is probed for all three and
+returns -1 (-EPERM), so the driver core logs three "probe with driver
+aic_load_fw failed with error -1" lines at error level on every boot,
+although WLAN and Bluetooth work.
 
-  aic_load_fw 2-1.1:1.0: probe with driver aic_load_fw failed with error -1
-  aic_load_fw 2-1.1:1.1: probe with driver aic_load_fw failed with error -1
-  aic_load_fw 2-1.1:1.2: probe with driver aic_load_fw failed with error -1
-
-at dev_err level, right where the WiFi/BT subsystem comes up -- and yet WiFi
-and Bluetooth both work. It reads as a failed radio and is not one.
-
-Why three lines. aicwf_usb_id_table matched with USB_DEVICE(), which sets only
-USB_DEVICE_ID_MATCH_DEVICE (include/linux/usb.h:1015), i.e. idVendor+idProduct
-and nothing about the interface. USB binds per interface, so usb_probe_interface()
-calls the loader's probe once for every interface of a matching device. After the
-firmware upload the part re-enumerates as a69c:8d81 with bNumInterfaces=3 --
-two Bluetooth interfaces at class/subclass/protocol e0/01/01 for btusb, and one
-vendor-specific ff/ff/ff for aic8800_fdrv -- so the loader is asked three times
-and refuses three times.
-
-Why dev_err instead of a quiet decline. The refusal returned a bare -1. That is
--EPERM (include/uapi/asm-generic/errno-base.h:5), and drivers/base/dd.c:643-660
-gives -ENODEV and -ENXIO their own arm -- logged as dev_dbg "rejects match" --
-while everything else falls into the default arm and is logged as dev_err. So a
-deliberate "not mine" was reported as a probe failure.
-
-The fix, and why it is the driver's own rule rather than a new claim about the
-hardware: aic_load_fw only ever drives the vendor-specific interface. Its own
-aicwf_parse_usb() enforces that, rejecting anything that is not ff/ff/ff with
-"non WLAN interface" and -ENODEV, for every part id without exception. Matching
-the whole device can therefore never gain the loader an interface it would keep;
-it can only cost probe calls it must refuse. The table is narrowed to
-USB_DEVICE_AND_INTERFACE_INFO(..., 0xff, 0xff, 0xff) -- the same match
-aic8800_fdrv already uses for 8801/8d81/8d41/8800DC/8d81x2 -- and the one
-remaining legitimate refusal (vendor interface of a loaded part, fw_loaded == 1)
-returns -ENODEV.
-
-Unchanged: the fw_loaded == 0 path, where the module
-is loaded while the part is already at its post-download id and rwnx_send_reboot()
-has to push it back into download mode. That path runs on the vendor interface,
-which still matches.
-
-Measured on the board, 2026-08-15:
-  - 2-1.1 is a69c:8d81, bDeviceClass ef, bNumInterfaces 3
-  - 2-1.1:1.0 e0/01/01 -> btusb, 2-1.1:1.1 e0/01/01 -> btusb,
-    2-1.1:1.2 ff/ff/ff -> aic8800_fdrv
-  - the loader's own probe print names the id it was called with:
-    "aicwf_usb_probe vid:0xA69C pid:0x8D81 icl:0x0 isc:0x0 ipr:0x0", three times,
-    icl/isc/ipr all zero because USB_DEVICE() leaves those match fields unset.
-
-Not a leak and not a race: the refusal returns before the first kzalloc, and
-usb_probe_interface()'s err path (drivers/usb/core/driver.c) already rebalances
-intfdata, LPM and runtime-PM and leaves the interface UNBOUND for the next driver
--- which is how btusb and aic8800_fdrv bind it today. This patch removes the
-log lines and narrows the match; it does not change what ends up bound.
-
-SPDX-License-Identifier: GPL-2.0-only
+aic_load_fw only drives the vendor interface; aicwf_parse_usb() already
+rejects anything else. Use USB_DEVICE_AND_INTERFACE_INFO(..., 0xff, 0xff,
+0xff) for all table entries, as aic8800_fdrv does, and return -ENODEV
+instead of -1 when the firmware is already loaded; the driver core logs
+-ENODEV at debug level. The fw_loaded == 0 path is not changed.
 
 Assisted-by: Claude
 

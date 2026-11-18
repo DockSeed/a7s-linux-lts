@@ -1,0 +1,29 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: free a msg-in frame whose copy cannot be
+ allocated
+
+aicwf_process_msg_rxframes() takes one skb per round off msg_rxq. For a
+data frame it copies the frame into a new skb. If that allocation fails,
+it calls skb_pull() on the received skb and continues; the next round
+dequeues the next skb, so the current one is never freed and msg_rx_cnt
+is never decremented. Each failed allocation leaks one 2 KiB skb.
+
+Free the skb and decrement msg_rx_cnt, as the normal end of the round
+does, and continue with the next one. The frame is lost, as before.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index 558c58a..703ad0a 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -973,7 +973,8 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
+             skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);//8 is for ccmp mic or wep icv
+             if(skb_inblock == NULL){
+                 txrx_err("no more space! skip!\n");
+-                skb_pull(skb, adjust_len);
++                dev_kfree_skb(skb);
++                atomic_dec(&rx_priv->msg_rx_cnt);
+                 continue;
+             }
+ 

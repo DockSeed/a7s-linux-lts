@@ -1,12 +1,11 @@
-# Applied in this order; file names carry no numbers.
+# Ours, applied in this order after upstream/series; file names carry no numbers.
 compat-build-against-linux-6.18.patch
-aic_load_fw-set-cache-bit-before-firmware-upload.patch
+aic_load_fw-print-the-cache-address-when-its-read-fails.patch
 aic_load_fw-match-only-the-vendor-interface.patch
 aic_load_fw-track-firmware-upload-per-part.patch
-aic8800-lower-the-default-log-level.patch
 regulatory-let-cfg80211-govern-the-radio.patch
 aic8800_fdrv-keep-draining-rx-after-a-bad-aggregate.patch
-aic8800_fdrv-drop-the-disconnect-handshake-from-rx-completion.patch
+aic8800_fdrv-add-a-test-stimulus-for-failed-bulk-in-completions.patch
 aic_load_fw-bound-the-rx-parser-to-the-buffer.patch
 aic8800_fdrv-do-not-advertise-monitor-mode.patch
 aic8800_fdrv-print-the-mgmt-tx-status-through-dynamic-debug.patch
@@ -19,3 +18,22 @@ aic_load_fw-a-timed-out-firmware-message-fails-and-is-freed.patch
 aic8800_fdrv-count-received-data-frames-in-the-interface-statistics.patch
 aic_load_fw-keep-the-driver-data-of-the-usb-device-alone.patch
 aic8800_fdrv-keep-the-driver-data-of-the-usb-device-alone.patch
+aic8800_fdrv-bound-the-a-msdu-subframe-length.patch
+aic8800_fdrv-bound-the-message-dispatch-to-the-handler-tables.patch
+aic8800_fdrv-check-whole-rx-frames-and-messages-against-what-was-received.patch
+aic8800_fdrv-drop-rx-frames-whose-station-index-is-out-of-range.patch
+aic8800_fdrv-keep-qos-tids-8-15-out-of-the-rx-reorder.patch
+aic8800_fdrv-read-the-a-msdu-flag-before-the-split-frees-the-frame.patch
+aic8800_fdrv-bound-the-firmware-assert-text-to-its-buffer.patch
+aic8800_fdrv-check-firmware-table-indexes-in-the-message-handlers.patch
+aic8800_fdrv-bound-the-scan-result-frame-to-its-message.patch
+aic8800_fdrv-bound-the-association-ie-lengths-to-their-buffer.patch
+aic_load_fw-no-busy-wait-under-the-rx-pool-lock.patch
+aic8800_fdrv-retry-a-failed-rx-submit-later-instead-of-mdelay-100.patch
+aic8800_fdrv-end-the-msg-in-refill-loop-when-a-submit-fails.patch
+aic8800_fdrv-re-arm-the-bulk-in-urbs-after-a-transfer-error.patch
+aic8800_fdrv-free-an-unsent-tx-frame-by-its-type-drop-it-on-copy-failure.patch
+aic8800_fdrv-let-a-tx-frame-skip-the-tcp-ack-filter-if-allocation-fails.patch
+aic8800_fdrv-make-rx-defragmentation-safe-against-long-fragments-timeout.patch
+aic8800_fdrv-free-a-msg-in-frame-whose-copy-cannot-be-allocated.patch
+aic8800_fdrv-clear-the-confirmation-slot-of-a-dropped-tx-frame.patch

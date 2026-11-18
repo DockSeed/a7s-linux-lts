@@ -15,7 +15,32 @@ may be short).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- USB host on the A733: the HCI interface register selects AHB INCR16 bursts
+  instead of INCR8, as the vendor kernel does for this SoC
+  (`phy-sun4i-usb-use-incr16-bursts-on-the-a733`). With INCR8 the AIC8800
+  WLAN on USB1 stopped under memory load from a second bus master; the
+  register reads `0x0b01` instead of `0x0701`. The binding gains the A733
+  compatible the device tree already uses
+  (`dt-bindings-phy-sun50i-a64-usb-phy-add-the-a733`). Other SoCs are
+  unchanged. Tested as `v6.18.63-T1`.
+- aic8800: lengths and indexes from the device are checked before use (rx
+  frames, A-MSDU subframes, firmware messages and their table indexes, scan
+  results, association IEs, QoS TIDs), and the error paths of rx refill,
+  bulk-in errors, tx drops and rx defragmentation no longer sleep in atomic
+  context, leak or use freed memory (patches 20-38 in
+  `out-of-tree/aic8800/README.md`). New counters `rx_bad_frame_drops` and
+  `rx_unknown_msgs`.
+
+### Changed
+
+- aic8800: patches from other projects are carried unchanged in
+  `out-of-tree/aic8800/patches/upstream/` and applied before ours: Feng
+  Zhang's `fix-Lower-the-debugging-log-level`, bnister's Bluetooth firmware
+  upload fix and Jiali Chen's `fix-usb-suspend-reboot-hang`. What we changed
+  in them is a patch of our own on top. Feng Zhang's PCIe and SDIO hunks now
+  apply too (not built). Our patch messages are shorter.
 
 ## [6.18.63-R2] - 2026-11-15
 

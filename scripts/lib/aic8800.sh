@@ -8,7 +8,8 @@
 #
 # The driver is vendor code used as shipped, not imported as kernel patches
 # (out-of-tree/aic8800/README.md): about 130 files fetched at the pinned commit
-# of radxa-pkg/aic8800, plus the patch series in out-of-tree/aic8800/patches/.
+# of radxa-pkg/aic8800, plus other projects' patches unchanged
+# (out-of-tree/aic8800/patches/upstream/) and ours (out-of-tree/aic8800/patches/).
 # Nothing from that source is committed here. The firmware is not part of this
 # recipe.
 #
@@ -31,17 +32,68 @@ stage_pins_aic8800() {
   log "           $(grep -cEv '^(#|$)' "${ROOT_DIR}/out-of-tree/aic8800/patches/series") patches"
 }
 
+# aic8800_upstream_roots <series>: "<entry> <root>" per entry of
+# patches/upstream/series; <root> is "." unless a "# root: <dir>" line comes
+# before the entry (its paths start below the tree root).
+aic8800_upstream_roots() {
+  awk '
+    /^# root: / { root = substr($0, 9); next }
+    /^#/ || /^$/ { next }
+    { print $0, (root == "" ? "." : root); root = "" }
+  ' "$1"
+}
+
+# aic8800_apply_unchanged <patch> <root>: applies another project's patch as
+# published, file by file with `patch -p1 --fuzz=0` from <root>. Where the
+# target file has CRLF line ends (some vendor files do; quilt accepts that,
+# `git apply` does not), the hunk lines get CRLF for that file. Context and
+# content stay exact: no fuzz, no whitespace tolerance.
+aic8800_apply_unchanged() {
+  local patch="$1" root="$2" tmp n t
+  tmp="$(mktemp -d)"
+  awk -v d="${tmp}" '/^diff / { n++ } n { print > (d "/" n ".diff") }' "${patch}"
+  for n in $(ls "${tmp}" | sort -n); do
+    t="$(awk '/^\+\+\+ / { p = $2; sub(/\t.*/, "", p); sub(/^b\//, "", p); print p; exit }' "${tmp}/${n}")"
+    [ -n "${t}" ] || { rm -rf "${tmp}"; return 1; }
+    if [ -f "${root}/${t}" ] && grep -q $'\r$' "${root}/${t}"; then
+      awk '
+        /^@@/ { h = 1; print; next }
+        /^(diff |--- |\+\+\+ |index )/ { h = 0 }
+        h && /^[ +-]/ && !/\r$/ { printf "%s\r\n", $0; next }
+        { print }
+      ' "${tmp}/${n}" > "${tmp}/${n}.crlf" && mv "${tmp}/${n}.crlf" "${tmp}/${n}"
+    fi
+    patch -d "${root}" -p1 --fuzz=0 -N -s --no-backup-if-mismatch < "${tmp}/${n}" \
+      || { rm -rf "${tmp}"; return 1; }
+  done
+  rm -rf "${tmp}"
+}
+
 stage_fetch_aic8800() {
   mkdir -p "${WORK_DIR}"
-  local dir="${WORK_DIR}/aic8800" p
+  local dir="${WORK_DIR}/aic8800" up="${ROOT_DIR}/out-of-tree/aic8800/patches/upstream" p e r
+  local -A root=()
   git_fetch_pinned "${AIC8800_URL}" "${AIC8800_COMMIT}" "${dir}"
   log "aic8800 at ${AIC8800_COMMIT} (tag ${AIC8800_TAG}, verified)"
 
-  # Order: out-of-tree/aic8800/patches/series. `git apply` is exact on context,
-  # so the order is not cosmetic.
+  # First the patches of other projects, unchanged (patches/upstream/series),
+  # then ours (patches/series) on top. Both orders matter: ours are made
+  # against the tree with the others applied.
+  series_load "${up}" \
+    || die "aic8800: patches/upstream/series is missing, empty or malformed"
+  while read -r e r; do root[${e}]=${r}; done < <(aic8800_upstream_roots "${up}/series")
+  cd "${dir}"
+  for p in "${SERIES[@]}"; do
+    r="${root[${p}]:-.}"
+    case "/${r}/" in //*|*/../*) die "aic8800: upstream/${p}: root '${r}' is not inside the tree" ;; esac
+    [ -d "${r}" ] || die "aic8800: upstream/${p}: root '${r}' does not exist"
+    aic8800_apply_unchanged "${up}/${p}" "${r}" || die "aic8800: upstream/${p} did not apply"
+    log "applied upstream/${p}"
+  done
+
+  # `git apply` is exact on context, so the order is not cosmetic.
   series_load "${ROOT_DIR}/out-of-tree/aic8800/patches" \
     || die "aic8800: patches/series is missing, empty or malformed"
-  cd "${dir}"
   for p in "${SERIES[@]}"; do
     git apply --whitespace=nowarn "${ROOT_DIR}/out-of-tree/aic8800/patches/${p}" \
       || die "aic8800: ${p} did not apply"

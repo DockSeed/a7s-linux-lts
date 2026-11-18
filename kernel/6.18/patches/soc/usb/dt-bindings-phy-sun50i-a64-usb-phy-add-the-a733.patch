@@ -1,0 +1,30 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] dt-bindings: phy: allwinner,sun50i-a64-usb-phy: add the A733
+
+The A733 device tree already describes its USB PHY as
+"allwinner,sun60i-a733-usb-phy" with "allwinner,sun20i-d1-usb-phy" as
+fallback, but the binding does not list the A733, so dtbs_check rejects
+the node.
+
+Add it next to the A100 and A523, which use the same fallback. The D1
+fallback stays functional: a kernel that only knows the D1 runs the
+A733 PHY, but with INCR8 host bursts, which fail under memory load. The
+following patch selects INCR16 for the A733 compatible in the driver.
+
+Assisted-by: Claude
+---
+ .../devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml    | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml b/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml
+index 580c3296a..da4ad6fb3 100644
+--- a/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml
++++ b/Documentation/devicetree/bindings/phy/allwinner,sun50i-a64-usb-phy.yaml
+@@ -23,6 +23,7 @@ properties:
+           - enum:
+               - allwinner,sun50i-a100-usb-phy
+               - allwinner,sun55i-a523-usb-phy
++              - allwinner,sun60i-a733-usb-phy
+           - const: allwinner,sun20i-d1-usb-phy
+ 
+   reg:

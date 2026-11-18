@@ -1,0 +1,32 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: bound the firmware assert text to its buffer
+
+rwnx_fw_assert_ind() copies ind->len bytes of ind->info into a 256-byte
+stack buffer and terminates it at buffer[ind->len]. ind->len is a u32
+from the device and is not checked. From 256 up the copy and the
+terminator write past the stack buffer; from 385 up the copy also reads
+past ind->info[384].
+
+Clamp the length to 255 characters.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index 5a874c4..c98c4cf 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -1644,9 +1644,12 @@ static inline int rwnx_fw_assert_ind(struct rwnx_hw *rwnx_hw,
+ {
+     struct fw_assert_info_ind *ind = (struct fw_assert_info_ind *)msg->param;
+     uint8_t buffer[256];
++    /* ind->len is a u32 from the device; buffer holds 255 characters and
++     * ind->info 384. */
++    u32 len = min_t(u32, ind->len, sizeof(buffer) - 1);
+ 
+-    memcpy(buffer, ind->info, ind->len);
+-    buffer[ind->len] = '\0';
++    memcpy(buffer, ind->info, len);
++    buffer[len] = '\0';
+ 
+     printk("%s: %s\n", __func__, buffer);
+ 

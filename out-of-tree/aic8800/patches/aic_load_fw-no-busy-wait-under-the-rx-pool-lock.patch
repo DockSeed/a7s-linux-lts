@@ -1,0 +1,28 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic_load_fw: no busy-wait under the rx pool lock
+
+aicwf_prealloc_rxbuff_alloc() spins for 10 ms with mdelay(10) when fewer
+than 10 buffers are left in the pool, after spin_lock_irqsave() on the
+pool lock. Its caller, aicwf_usb_submit_rx_urb() in aic8800_fdrv, runs in
+the bulk-in completion, so the host controller's bottom half stalls with
+interrupts off for each URB. The wait cannot refill the pool:
+aicwf_prealloc_rxbuff_free() takes the same lock.
+
+Drop the mdelay(10) and keep the warning. When the pool is empty the
+function already returns NULL, and the caller sets rx_urb_sched so the
+busrx thread re-arms the URB once it has freed a buffer.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c
+index d29edfd..551dc6d 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicwf_rx_prealloc.c
+@@ -37,7 +37,6 @@ struct rx_buff *aicwf_prealloc_rxbuff_alloc(spinlock_t *lock)
+         AICWFDBG(LOGERROR, "%s WARNING rxbuff is running out %d\r\n", __func__,
+             rx_buff_list_ava);
+         //msleep(10);
+-        mdelay(10);
+     }
+ 
+     if (list_empty(&aic_rx_buff_list.rxbuff_list)) {

@@ -1,0 +1,258 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: check whole rx frames and messages against what
+ was received
+
+In the prealloc rx path with aggregation, aicwf_process_rxframes() checks
+only pkt_len against the bytes left, but a data frame occupies
+pkt_len + 60 bytes (hw_rxhdr) and a config frame pkt_len + 4. A frame
+can end past the buffer, and buffer->len (u32) can wrap so the check
+never fires again. The message endpoint path has no length check. A
+config frame shorter than a message header reaches
+rwnx_rx_handle_msg(), which reads id and param_len past the copy.
+
+Require the whole frame to fit in both prealloc paths and on the message
+endpoint, else drop the rest and count it in rx_bad_len_drops. The last
+config frame may end without padding. The config copy is zero-padded to
+a struct ipc_e2a_msg or 8 bytes. rwnx_rx_handle_msg() takes the frame
+length, drops a frame shorter than the message header and clamps
+param_len; both count in rx_bad_frame_drops.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index ebabd81..558c58a 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -445,7 +445,7 @@ int aicwf_tasklet_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				}
+ 				memcpy(msg, data, aggr_len + 4);
+ 			if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP)
+-					rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++					rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+ 				if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+ 					aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+@@ -464,6 +464,32 @@ int aicwf_tasklet_rxframes(struct aicwf_rx_priv *rx_priv)
+ 
+ extern bool rx_urb_sched;
+ extern uint rx_bad_len_drops;
++
++/* Bytes a frame occupies from its first byte: a data frame is the 60-byte
++ * hw_rxhdr (the 4-byte length/type head included) plus pkt_len, a config
++ * frame the 4-byte head plus pkt_len. Padding after the frame is not
++ * counted; the last frame of a transfer need not have it. */
++static u32 aicwf_rx_frame_len(const u8 *data, u16 pkt_len)
++{
++    if ((data[2] & USB_TYPE_CFG) != USB_TYPE_CFG)
++        return (u32)pkt_len + RX_HWHRD_LEN;
++    return (u32)pkt_len + 4;
++}
++
++/* Copy a config frame for its handler. Handlers read their parameter
++ * struct by type, not by length, so the copy is zero-padded: a command
++ * response to a whole ipc_e2a_msg, anything else to the 8 bytes the tx
++ * confirmation handler reads. */
++static u8 *aicwf_rx_msg_copy(const u8 *data, u16 pkt_len)
++{
++    size_t min = (data[2] & 0x7f) == USB_TYPE_CFG_CMD_RSP ?
++                 sizeof(struct ipc_e2a_msg) : 8;
++    u8 *msg = kzalloc(4 + max_t(size_t, pkt_len, min), GFP_KERNEL);
++
++    if (msg)
++        memcpy(msg, data, (size_t)pkt_len + 4);
++    return msg;
++}
+ extern int rx_inject_bad_len;
+ extern int rx_bad_len_backlog_max;
+ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+@@ -531,7 +557,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 
+                 memcpy(msg, data, aggr_len + 4);
+                 if((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP)
+-                    rwnx_rx_handle_msg(rx_priv->sdiodev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++                    rwnx_rx_handle_msg(rx_priv->sdiodev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+                 if((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_DATA_CFM)
+                     aicwf_sdio_host_tx_cfm_handler(&(rx_priv->sdiodev->rwnx_hw->sdio_env), (u32 *)(msg + 4));
+@@ -592,7 +618,10 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+                     rx_inject_bad_len--;
+                     pkt_len = buffer->len + 1;
+                 }
+-                if (pkt_len > buffer->len) {
++                /* The frame, not only pkt_len, must fit: data frames carry
++                 * 60 more bytes, config frames 4. Checking pkt_len alone let
++                 * buffer->len (u32) wrap below and the check go blind. */
++                if (aicwf_rx_frame_len(data, pkt_len) > buffer->len) {
+                     AICWFDBG(LOGERROR, "%s pkt_len:%d buffer->len:%d\r\n", __func__, pkt_len, buffer->len);
+                     /* Drop the rest of this aggregate, keep draining the queue. */
+                     rx_bad_len_drops++;
+@@ -625,15 +654,14 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+                     else
+                         adjust_len = aggr_len;
+ 
+-                    msg = kmalloc(aggr_len+4, GFP_KERNEL);
++                    msg = aicwf_rx_msg_copy(data, aggr_len);
+                     if(msg == NULL){
+                         txrx_err("no more space for msg!\n");
+                         break;
+                     }
+-                    memcpy(msg, data, aggr_len + 4);
+ 
+                     if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+-                        rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++                        rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+                     if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                         aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+@@ -641,8 +669,9 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+                     if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
+                         rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
+ 
+-                    buffer->read = buffer->read + (adjust_len + 4);
+-                    buffer->len -= (adjust_len + 4);
++                    /* The last frame may end without its padding. */
++                    buffer->read = buffer->read + min_t(u32, adjust_len + 4, buffer->len);
++                    buffer->len -= min_t(u32, adjust_len + 4, buffer->len);
+                     kfree(msg);
+                 }
+             }
+@@ -673,7 +702,8 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+             pkt_len = (*data | (*(data + 1) << 8));
+             //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
+ #ifndef CONFIG_USB_RX_REASSEMBLE
+-            if (pkt_len > buffer->len) {
++            if (buffer->len < 4 || aicwf_rx_frame_len(data, pkt_len) > buffer->len) {
++                rx_bad_len_drops++;
+                 AICWFDBG(LOGERROR, "%s pkt_len:%d buffer->len:%d\r\n", __func__, pkt_len, buffer->len);
+                 aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
+                 atomic_dec(&rx_priv->rx_cnt);
+@@ -700,16 +730,15 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+                 else
+                     adjust_len = aggr_len;
+ 
+-                msg = kmalloc(aggr_len+4, GFP_KERNEL);
++                msg = aicwf_rx_msg_copy(data, aggr_len);
+                 if(msg == NULL){
+                     txrx_err("no more space for msg!\n");
+                     aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
+                     return -EBADE;
+                 }
+-                memcpy(msg, data, aggr_len + 4);
+ 
+                 if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+-                    rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++                    rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+                 if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                     aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+@@ -798,7 +827,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+                     memcpy(msg, data, aggr_len + 4);
+ 
+                     if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+-                        rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++                        rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+                     if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                         aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+@@ -862,7 +891,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+                 memcpy(msg, data, aggr_len + 4);
+ 
+                 if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+-                    rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++                    rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+                 if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                     aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+@@ -910,7 +939,21 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
+             break;
+         }
+         data = skb->data;
++        if (skb->len < 4) {
++            rx_bad_len_drops++;
++            dev_kfree_skb(skb);
++            atomic_dec(&rx_priv->msg_rx_cnt);
++            continue;
++        }
+         pkt_len = (*skb->data | (*(skb->data + 1) << 8));
++        /* pkt_len comes from the device: the whole frame must lie in the transfer. */
++        if (aicwf_rx_frame_len(data, pkt_len) > skb->len) {
++            AICWFDBG(LOGERROR, "%s pkt_len:%d skb->len:%d\r\n", __func__, pkt_len, skb->len);
++            rx_bad_len_drops++;
++            dev_kfree_skb(skb);
++            atomic_dec(&rx_priv->msg_rx_cnt);
++            continue;
++        }
+         //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
+ #if 0 //amsdu > 1600
+         if (pkt_len > 1600) {
+@@ -951,16 +994,15 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
+             else
+                 adjust_len = aggr_len;
+ 
+-            msg = kmalloc(aggr_len+4, GFP_KERNEL);
++            msg = aicwf_rx_msg_copy(data, aggr_len);
+             if(msg == NULL){
+                 txrx_err("no more space for msg!\n");
+                 aicwf_dev_skb_free(skb);
+                 return -EBADE;
+             }
+-            memcpy(msg, data, aggr_len + 4);
+ 
+             if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+-                rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++                rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4), aggr_len);
+ 
+             if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                 aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index e8d8451..5a874c4 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -1736,11 +1736,12 @@ static const struct rwnx_msg_hdlrs msg_hdlrs[] = {
+ };
+ 
+ extern uint rx_unknown_msgs;
++extern uint rx_bad_frame_drops;
+ 
+ /**
+  *
+  */
+-void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
++void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg, u32 len)
+ {
+ 	//printk("%s(%d) MSG_T(msg->id):%d MSG_I(msg->id):%d cmd:%s\r\n", __func__, 
+ 	//	msg->id,
+@@ -1750,6 +1751,20 @@ void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
+     unsigned int task = MSG_T(msg->id);
+     unsigned int idx = MSG_I(msg->id);
+     msg_cb_fct cb = NULL;
++    const u32 hdr = offsetof(struct ipc_e2a_msg, param);
++
++    /* len is what the frame carried (the copy behind msg is zero-padded to
++     * a whole ipc_e2a_msg). A frame shorter than the header is not a
++     * message; param_len is clamped to the frame, so cmd_mgr_msgind()
++     * copies only what was received. */
++    if (len < hdr) {
++        rx_bad_frame_drops++;
++        return;
++    }
++    if (msg->param_len > len - hdr) {
++        rx_bad_frame_drops++;
++        msg->param_len = len - hdr;
++    }
+ 
+     /* msg->id comes from the device: only an existing handler slot is
+      * called. A message without one still goes to msgind(), so a command
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h
+index b5556d1..d74cb28 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h
+@@ -13,7 +13,7 @@
+ #ifndef _RWNX_MSG_RX_H_
+ #define _RWNX_MSG_RX_H_
+ 
+-void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg);
++void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg, u32 len);
+ void rwnx_rx_handle_print(struct rwnx_hw *rwnx_hw, u8 *msg, u32 len);
+ 
+ #endif /* _RWNX_MSG_RX_H_ */

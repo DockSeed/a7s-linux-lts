@@ -1,0 +1,63 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: end the msg-in refill loop when a submit fails
+
+aicwf_usb_msg_rx_submit_all_urb() takes buffers off msg_rx_free_list
+until it is empty. aicwf_usb_submit_msg_rx_urb() puts the buffer back on
+that list on every failure, so the loop retries the same buffer at once.
+A failing usb_submit_urb() returns 0 after mdelay(100), so the loop does
+not see the failure; a failing __dev_alloc_skb(GFP_ATOMIC) returns -1 and
+the loop continues. In the host controller's bottom half this spins in
+100 ms steps or, for the allocation, without delay.
+
+Make both failures end the loop, as the data-URB loop does: the submit
+failure returns -1 without the mdelay(100), and the loop returns on any
+failure. The buffer is submitted again by the next msg-in completion. For
+the transient cases (skb allocation, -ENOMEM and -EAGAIN) rx_refill_retry
+is scheduled as well, and it now also refills the msg-in URBs.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index a6e2384..6b593af 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -939,6 +939,7 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
+     skb = __dev_alloc_skb(AICWF_USB_MSG_MAX_PKT_SIZE, GFP_ATOMIC);
+     if (!skb) {
+         aicwf_usb_msg_rx_buf_put(usb_dev, usb_buf);
++        aicwf_usb_rx_retry_later(usb_dev);
+         return -1;
+     }
+ 
+@@ -960,7 +961,9 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
+         usb_buf->skb = NULL;
+         aicwf_usb_msg_rx_buf_put(usb_dev, usb_buf);
+ 
+-        mdelay(100);
++        if (ret == -ENOMEM || ret == -EAGAIN)
++            aicwf_usb_rx_retry_later(usb_dev);
++        return -1;
+     }
+     return 0;
+ }
+@@ -978,8 +981,7 @@ static void aicwf_usb_msg_rx_submit_all_urb(struct aic_usb_dev *usb_dev)
+     while((usb_buf = aicwf_usb_msg_rx_buf_get(usb_dev)) != NULL) {
+         if (aicwf_usb_submit_msg_rx_urb(usb_dev, usb_buf)) {
+             AICWFDBG(LOGERROR, "usb msg rx refill fail\n");
+-            if (usb_dev->state != USB_UP_ST)
+-                return;
++            return;
+         }
+     }
+ }
+@@ -2060,6 +2062,10 @@ static void aicwf_usb_rx_refill_retry(struct work_struct *work)
+     if (usb_dev->state != USB_UP_ST)
+         return;
+     aicwf_usb_rx_submit_all_urb(usb_dev);
++#ifdef CONFIG_USB_MSG_IN_EP
++    if (usb_dev->msg_in_pipe)
++        aicwf_usb_msg_rx_submit_all_urb(usb_dev);
++#endif
+ }
+ 
+ #ifdef CONFIG_USB_MSG_IN_EP

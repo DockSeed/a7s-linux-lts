@@ -1,0 +1,44 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: let a tx frame skip the TCP ACK filter if
+ allocation fails
+
+rwnx_start_xmit() allocates a struct msg_buf for every frame of at most
+MAX_TCP_ACK (200) bytes before asking the TCP ACK filter.
+intf_tcp_alloc_msg() uses kzalloc(GFP_ATOMIC), prints on failure and
+then memset()s the result anyway, and the caller writes msgbuf->rwnx_vif
+right after. A failed allocation is a NULL dereference in the transmit
+path for every small frame.
+
+intf_tcp_alloc_msg() no longer touches a NULL result (the memset() is
+dropped, kzalloc() already zeroes), and rwnx_start_xmit() skips the
+filter when it gets NULL. The frame is sent unfiltered.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+index 1e5c254..feec72e 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+@@ -10,7 +10,6 @@ struct msg_buf *intf_tcp_alloc_msg(struct msg_buf *msg)
+ 	msg = kzalloc(len , GFP_ATOMIC);
+ 	if(!msg)
+ 		printk("%s: alloc failed \n", __func__);
+-	memset(msg,0,len);
+ 	return msg;
+ }
+ 						
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
+index 211e352..675da64 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
+@@ -1467,8 +1467,8 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 		skb->priority = 0;
+ 
+ #ifdef CONFIG_FILTER_TCP_ACK
+-	if(cpu_to_le16(skb->len) <= MAX_TCP_ACK){
+-        msgbuf=intf_tcp_alloc_msg(msgbuf);
++	if(cpu_to_le16(skb->len) <= MAX_TCP_ACK &&
++	   (msgbuf = intf_tcp_alloc_msg(msgbuf)) != NULL){
+         msgbuf->rwnx_vif=rwnx_vif;
+         msgbuf->skb=skb;
+         if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){

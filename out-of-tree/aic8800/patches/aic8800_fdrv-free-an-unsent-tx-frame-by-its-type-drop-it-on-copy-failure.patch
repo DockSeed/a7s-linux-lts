@@ -1,0 +1,118 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: free an unsent tx frame by its type, drop it on
+ copy failure
+
+aicwf_usb_bus_txdata() attaches to a tx URB the skb or, for a frame that
+needs a firmware confirmation, a kmalloc() copy (usb_buf->cfm tells
+which). aicwf_usb_tx_complete() frees by that flag, but a failed submit
+in aicwf_usb_tx_process() and aicwf_usb_tx_prepare() call
+dev_kfree_skb(): a kmalloc() buffer goes to the skb allocator and the
+alignment copy leaks. The copy for a confirmed frame is also used
+without a NULL check, and a failed alignment copy leaves buf_align
+uninitialised in the URB.
+
+Add aicwf_usb_tx_buf_release(), which frees by usb_buf->cfm and also the
+alignment copy, and use it in both places. A failed copy drops the frame
+like the "no free URB" branch: free the skb (and for a confirmed frame
+its sw_txhdr and copy) and return the URB to tx_free_list.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index ed79eff..0c1c50c 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -1037,6 +1037,28 @@ static void aicwf_usb_msg_rx_prepare(struct aic_usb_dev *usb_dev)
+ #endif
+ 
+ 
++#ifndef CONFIG_USB_TX_AGGR
++/* Free what aicwf_usb_bus_txdata() attached to a tx URB that will not be
++ * sent, by the same rules as aicwf_usb_tx_complete() for one that was: the
++ * skb, or for a frame that waits for a confirmation the kmalloc copy (the
++ * skb stays with the confirmation bookkeeping), and the alignment copy.
++ */
++static void aicwf_usb_tx_buf_release(struct aicwf_usb_buf *usb_buf)
++{
++#ifdef CONFIG_USB_ALIGN_DATA
++    kfree(usb_buf->usb_align_data);
++    usb_buf->usb_align_data = NULL;
++#endif
++    if (usb_buf->cfm == false)
++        dev_kfree_skb_any(usb_buf->skb);
++#if !defined CONFIG_USB_NO_TRANS_DMA_MAP
++    else
++        kfree(usb_buf->skb);
++#endif
++    usb_buf->skb = NULL;
++}
++#endif
++
+ static void aicwf_usb_tx_prepare(struct aic_usb_dev *usb_dev)
+ {
+     struct aicwf_usb_buf *usb_buf;
+@@ -1045,10 +1067,8 @@ static void aicwf_usb_tx_prepare(struct aic_usb_dev *usb_dev)
+         usb_buf = aicwf_usb_tx_dequeue(usb_dev, &usb_dev->tx_post_list,
+             &usb_dev->tx_post_count, &usb_dev->tx_post_lock);
+         #ifndef CONFIG_USB_TX_AGGR
+-        if(usb_buf->skb) {
+-            dev_kfree_skb(usb_buf->skb);
+-            usb_buf->skb = NULL;
+-        }
++        if(usb_buf->skb)
++            aicwf_usb_tx_buf_release(usb_buf);
+         #endif
+         aicwf_usb_tx_queue(usb_dev, &usb_dev->tx_free_list, usb_buf,
+                 &usb_dev->tx_free_count, &usb_dev->tx_free_lock);
+@@ -1285,8 +1305,7 @@ static void aicwf_usb_tx_process(struct aic_usb_dev *usb_dev)
+ #ifndef CONFIG_USB_TX_AGGR
+ fail:
+         usb_txc_sta_flowctrl(usb_buf, usb_dev);
+-        dev_kfree_skb(usb_buf->skb);
+-        usb_buf->skb = NULL;
++        aicwf_usb_tx_buf_release(usb_buf);
+         aicwf_usb_tx_queue(usb_dev, &usb_dev->tx_free_list, usb_buf,
+                     &usb_dev->tx_free_count, &usb_dev->tx_free_lock);
+ #endif
+@@ -1837,6 +1856,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+         buf = usb_buf->data_buf;
+         #else
+         buf = kmalloc(skb->len + 1, GFP_ATOMIC/*GFP_KERNEL*/);
++        if (!buf)
++            goto drop;
+         #endif
+         index += sizeof(usb_header);
+         memcpy(&buf[index], (u8 *)(long)&txhdr->sw_hdr->desc, sizeof(struct txdesc_api));
+@@ -1919,6 +1940,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+             align = ((unsigned long)(usb_buf->usb_align_data)) & (align_param - 1);
+             buf_align = usb_buf->usb_align_data + (align_param - align);
+             memcpy(buf_align, buf, buf_len);
++        } else {
++            goto drop;
+         }
+     } else {
+         buf_align = buf;
+@@ -1950,6 +1973,23 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+ #endif
+ 
+     ret = 0;
++    goto flow_ctrl;
++
++#if !defined CONFIG_USB_NO_TRANS_DMA_MAP
++drop:
++    /* A copy could not be allocated: the frame is lost, as when no URB is
++     * free above, and the URB goes back unused.
++     */
++    if (need_cfm) {
++        kfree(buf);
++        kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
++    }
++    dev_kfree_skb_any(skb);
++    usb_buf->skb = NULL;
++    aicwf_usb_tx_queue(usb_dev, &usb_dev->tx_free_list, usb_buf,
++                    &usb_dev->tx_free_count, &usb_dev->tx_free_lock);
++    ret = -ENOMEM;
++#endif
+ 
+     flow_ctrl:
+     spin_lock_irqsave(&usb_dev->tx_flow_lock, flags);
