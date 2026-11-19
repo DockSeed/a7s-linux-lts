@@ -29,7 +29,7 @@ index ba4576b..1e5c254 100644
  	ack_m->priv = priv;
  	spin_lock_init(&ack_m->lock);
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-index b72c1fb..63ecf38 100644
+index 8e6c37e..ca6af8c 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 @@ -2474,7 +2474,7 @@ static struct wireless_dev *rwnx_virtual_interface_add(struct rwnx_hw *rwnx_hw,
@@ -42,10 +42,10 @@ index b72c1fb..63ecf38 100644
  
      return wdev;
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-index 5ed6811..5085465 100644
+index 73449e7..fae0be4 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-@@ -2525,7 +2525,7 @@ check_len_update:
+@@ -2575,7 +2575,7 @@ check_len_update:
  
  
              if((ether_type[0] == 0x8e && ether_type[1] == 0x88) || (ether_type[0] == 0x88 && ether_type[1] == 0x8e))
@@ -55,7 +55,7 @@ index 5ed6811..5085465 100644
  			if (is_amsdu) {
  //Check NETGEAR R7000 router's AMSDU packet format for compliance. start
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
-index 411a49a..0a79ad2 100644
+index ed846b3..c1bec03 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
 @@ -52,8 +52,8 @@ static void aicsmac_driver_register(void)
@@ -70,7 +70,7 @@ index 411a49a..0a79ad2 100644
      aicwf_prealloc_init();
  #endif
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c
-index 1631534..d1c0627 100644
+index afa60f7..2bcdde4 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c
 @@ -175,19 +175,19 @@ int aicwf_patch_config_8800d80(struct aic_usb_dev *usb_dev)
@@ -105,7 +105,7 @@ index 1631534..d1c0627 100644
  		if (chip_mcu_id) {
  			ret = rwnx_send_dbg_mem_read_req(usb_dev, cache_mem_addr, &rd_mem_addr_cfm);
  			if (ret) {
-@@ -457,7 +457,7 @@ int aicfw_download_fw_8800d80(struct aic_usb_dev *usb_dev)
+@@ -459,7 +459,7 @@ int aicfw_download_fw_8800d80(struct aic_usb_dev *usb_dev)
          return -1;
      }
  
@@ -137,7 +137,7 @@ index 0115e9a..f553226 100644
  
  void aicwf_frame_tx(void *dev, struct sk_buff *skb)
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
-index afa29df..638853f 100644
+index 69473d7..e5a10af 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
 @@ -343,7 +343,7 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev
@@ -185,7 +185,7 @@ index afa29df..638853f 100644
  
  	if (size <= 0) {
  		printk("wrong size of firmware file\n");
-@@ -1418,17 +1418,17 @@ int aicbt_patch_table_load(struct aic_usb_dev *usbdev, struct aicbt_patch_table
+@@ -1449,17 +1449,17 @@ int aicbt_patch_table_load(struct aic_usb_dev *usbdev, struct aicbt_patch_table
  			*(data + 15) = aicbt_info[usbdev->chipid].lpm_enable;
  			*(data + 17) = aicbt_info[usbdev->chipid].txpwr_lvl;
  
@@ -211,10 +211,10 @@ index afa29df..638853f 100644
  		}
  		for (i = 0; i < p->len; i++) {
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
-index 48bb8c8..223cfc8 100644
+index 1c7371a..25f2626 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
-@@ -180,7 +180,7 @@ static void cmd_mgr_print(struct rwnx_cmd_mgr *cmd_mgr)
+@@ -185,7 +185,7 @@ static void cmd_mgr_print(struct rwnx_cmd_mgr *cmd_mgr)
      struct rwnx_cmd *cur;
  
      spin_lock_bh(&cmd_mgr->lock);

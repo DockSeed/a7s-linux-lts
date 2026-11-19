@@ -71,7 +71,7 @@ index 920a53f..caa139e 100644
  {
      return bus->ops->start(bus->dev);
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index b368165..301db61 100644
+index 80aeda7..05d4d6e 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 @@ -1457,7 +1457,7 @@ static void aicwf_usb_send_msg_complete(struct urb *urb)
@@ -146,7 +146,7 @@ index b368165..301db61 100644
  
  #ifdef CONFIG_GPIO_WAKEUP
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-index 63ecf38..d886f56 100644
+index ca6af8c..ec77d1d 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 @@ -1505,7 +1505,8 @@ static int rwnx_close(struct net_device *dev)

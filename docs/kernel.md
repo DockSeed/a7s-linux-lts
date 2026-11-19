@@ -41,12 +41,14 @@ a7s-build carry.
 1. `sudo a7s-kernel-update` installs the latest release (GitHub's "latest"
    leaves out drafts and pre-releases); `sudo a7s-kernel-update v6.18.63-R1`
    installs that release; a published test build is named the same way
-   (`v6.18.63-T1`, a pre-release, with a note that it is one). It downloads the three packages
+   (`v6.18.63-T1`, a pre-release, with a note that it is one). It downloads the packages
    of the release to a temporary directory below `/var/cache/a7s-kernel-update`,
    checks their sha256 against the release's `SHA256SUMS` (a mismatch removes
    the files and stops), installs them with `apt-get` and removes the directory.
    The `a7s-kernel-hook` package is installed only if the release has a newer one
-   than the installed, in an `apt-get` call of its own before the kernel packages. It ends with one line: either that the new kernel starts
+   than the installed, in an `apt-get` call of its own before the kernel packages;
+   `a7s-aic8800-dkms` (the WLAN driver) likewise, if its version differs from the
+   installed one. It ends with one line: either that the new kernel starts
    at the next boot, or that it does not, after the messages of the hook that say
    why. `sudo a7s-kernel-update --help` lists the steps. If the newest kernel is
    installed and set to start, it says so and does nothing. In safe mode it
@@ -187,12 +189,12 @@ For the maintainer; the steps are those of [release.yml](../.github/workflows/re
 2. `git tag v<kernel version>-R<n>` on that commit, `git push origin` the tag
    (a `-T<n>` tag makes a test build, a pre-release).
 3. The workflow builds the tag (`./build.sh all`, `deb`, `package`) and creates
-   a draft release: three packages, the loose files, `SHA256SUMS`, the changelog
+   a draft release: four packages, the loose files, `SHA256SUMS`, the changelog
    section as text.
 4. Read the draft (files, `KERNEL-ID`, text), then publish it by hand. Only a
    published `-R<n>` release is what `sudo a7s-kernel-update` installs.
 5. In a7s-build, move the pins together: `KERNEL_RELEASE_TAG`, `_COMMIT`, `_NAME`,
-   the three package names and their sha256 (from the release's `SHA256SUMS`)
+   the four package names and their sha256 (from the release's `SHA256SUMS`)
    in `scripts/stages/kernel.sh`, and `KERNEL_RECIPE_COMMIT` to the same commit.
 
 ## Good to know

@@ -20,10 +20,10 @@ returns if the entry is unlisted.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-index d886f56..0afe586 100644
+index ec77d1d..1f18824 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -9368,19 +9368,20 @@ void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw)
+@@ -9588,19 +9588,20 @@ void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw)
  
  
      spin_lock_bh(&rwnx_hw->defrag_lock);
@@ -55,10 +55,10 @@ index d886f56..0afe586 100644
      spin_unlock_bh(&rwnx_hw->defrag_lock);
  
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-index 3fef04d..572bca4 100644
+index 195c408..0372b05 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-@@ -2217,6 +2217,7 @@ void defrag_timeout_cb(struct timer_list *t)
+@@ -2221,6 +2221,7 @@ void defrag_timeout_cb(struct timer_list *t)
  #endif
  {
  	struct defrag_ctrl_info *defrag_ctrl = NULL;
@@ -66,7 +66,7 @@ index 3fef04d..572bca4 100644
  #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
  	defrag_ctrl = (struct defrag_ctrl_info *)data;
  #elif LINUX_VERSION_CODE < KERNEL_VERSION(6,16,0)
-@@ -2226,11 +2227,18 @@ void defrag_timeout_cb(struct timer_list *t)
+@@ -2230,11 +2231,18 @@ void defrag_timeout_cb(struct timer_list *t)
  #endif
  
  	printk("%s:%p\r\n", __func__, defrag_ctrl);
@@ -87,7 +87,7 @@ index 3fef04d..572bca4 100644
  }
  
  extern void rwnx_data_dump(char* tag, void* data, unsigned long len);
-@@ -2608,6 +2616,13 @@ check_len_update:
+@@ -2641,6 +2649,13 @@ check_len_update:
  							spin_unlock_bh(&rwnx_hw->defrag_lock);
  							return 0;
  						}
@@ -101,7 +101,7 @@ index 3fef04d..572bca4 100644
  
  						skb_put(defrag_info->skb, skb->len-(pull_len-8));
  						memcpy(&defrag_info->skb->data[defrag_info->frm_len], \
-@@ -2619,14 +2634,14 @@ check_len_update:
+@@ -2652,14 +2667,14 @@ check_len_update:
  						spin_unlock_bh(&rwnx_hw->defrag_lock);
  						return 0;
  					} else {
@@ -118,7 +118,7 @@ index 3fef04d..572bca4 100644
  						if (defrag_info->skb == NULL) {
  							printk("no fragment skb\r\n");
  							dev_kfree_skb(skb);
-@@ -2644,14 +2659,20 @@ check_len_update:
+@@ -2677,14 +2692,20 @@ check_len_update:
  						defrag_info->next_fn = 1;
  						defrag_info->tid = tid;
  						defrag_info->sta_idx = sta_idx;
@@ -141,7 +141,7 @@ index 3fef04d..572bca4 100644
  #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
  						init_timer(&defrag_info->defrag_timer);
  						defrag_info->defrag_timer.data = (unsigned long)defrag_info;
-@@ -2659,6 +2680,8 @@ check_len_update:
+@@ -2692,6 +2713,8 @@ check_len_update:
  #else
  						timer_setup(&defrag_info->defrag_timer, defrag_timeout_cb, 0);
  #endif
@@ -150,7 +150,7 @@ index 3fef04d..572bca4 100644
  						ret = mod_timer(&defrag_info->defrag_timer, jiffies + msecs_to_jiffies(DEFRAG_MAX_WAIT));
  						dev_kfree_skb(skb);
  						return 0;
-@@ -2684,6 +2707,13 @@ check_len_update:
+@@ -2717,6 +2740,13 @@ check_len_update:
  								spin_unlock_bh(&rwnx_hw->defrag_lock);
  								return 0;
  							}
@@ -164,7 +164,7 @@ index 3fef04d..572bca4 100644
  
  							skb_put(defrag_info->skb, skb->len - (pull_len-8));
  							memcpy(&defrag_info->skb->data[defrag_info->frm_len], \
-@@ -2703,15 +2733,14 @@ check_len_update:
+@@ -2736,15 +2766,14 @@ check_len_update:
  
  							skb_tmp = defrag_info->skb;
  							list_del_init(&defrag_info->list);

@@ -25,7 +25,8 @@
 # rules and the -dbg package is skipped (profile); neither is kept.
 # The AIC8800 driver is in neither package.
 #
-# The package a7s-kernel-hook (scripts/lib/hook.sh) is made after these two.
+# The packages a7s-kernel-hook (scripts/lib/hook.sh) and a7s-aic8800-dkms
+# (scripts/lib/dkms.sh) are made after these two.
 #
 # The kernel's headers package has no maintainer scripts. Ours gets a postinst
 # and a prerm that run /etc/kernel/header_postinst.d and header_prerm.d, as
@@ -89,6 +90,7 @@ SHIM
   cp "${img}" "${dest}/"
   deb_add_header_scripts "${hdr}" "${dest}/${hdr##*/}" "${rel}"
   stage_hook
+  stage_dkms
   log "deb: packages -> ${dest}"
   ls -l "${dest}" | sed 's/^/        /'
 }

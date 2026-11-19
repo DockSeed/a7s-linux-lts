@@ -8,7 +8,8 @@
 #
 # The driver is vendor code used as shipped, not imported as kernel patches
 # (out-of-tree/aic8800/README.md): about 130 files fetched at the pinned commit
-# of radxa-pkg/aic8800, plus other projects' patches unchanged
+# of radxa-pkg/aic8800 and prepared as Radxa ships it (CRLF_FILES to LF, then
+# its debian/patches/series), plus other projects' patches unchanged
 # (out-of-tree/aic8800/patches/upstream/) and ours (out-of-tree/aic8800/patches/).
 # Nothing from that source is committed here. The firmware is not part of this
 # recipe.
@@ -19,8 +20,8 @@
 # Pinned to a COMMIT, not the tag; the tag is recorded so a reader can find the
 # release.
 AIC8800_URL="https://github.com/radxa-pkg/aic8800.git"
-AIC8800_TAG="5.0+git20260123.5f7be68d-8"
-AIC8800_COMMIT="df4c783b663eba1956579c681acd5e45f25c671d"
+AIC8800_TAG="5.0+git20260123.5f7be68d-11"
+AIC8800_COMMIT="b6e136a9fe30a4babf0dde5ba9d02313e1c99c30"
 # The board's part sits on USB behind the on-board hub, so src/USB is the subtree.
 AIC8800_SUBDIR="src/USB/driver_fw/drivers/aic8800"
 # Modules that must resolve in the finished tree (aic8800_fdrv with its
@@ -69,20 +70,38 @@ aic8800_apply_unchanged() {
   rm -rf "${tmp}"
 }
 
-stage_fetch_aic8800() {
-  mkdir -p "${WORK_DIR}"
-  local dir="${WORK_DIR}/aic8800" up="${ROOT_DIR}/out-of-tree/aic8800/patches/upstream" p e r
+# aic8800_prepare_tree <tree> <patch-dir>: prepares a checkout of the pinned
+# commit (the whole repository, without .git) in place: Radxa's package as
+# shipped, then <patch-dir>/upstream/series, then <patch-dir>/series. Used by
+# fetch below and by the image recipe a7s-build, which packages the same tree
+# for DKMS; both get the same source this way. Needs log, die and series_load.
+aic8800_prepare_tree() {
+  local tree="$1" pdir="$2" up="$2/upstream" p e r f n=0
   local -A root=()
-  git_fetch_pinned "${AIC8800_URL}" "${AIC8800_COMMIT}" "${dir}"
-  log "aic8800 at ${AIC8800_COMMIT} (tag ${AIC8800_TAG}, verified)"
+  cd "${tree}" || die "aic8800: ${tree} does not exist"
 
-  # First the patches of other projects, unchanged (patches/upstream/series),
-  # then ours (patches/series) on top. Both orders matter: ours are made
-  # against the tree with the others applied.
+  # Radxa's package as shipped: the files its build converts to LF
+  # (CRLF_FILES in .github/local/Makefile.local), then its debian/patches/series
+  # with `patch -p1 --fuzz=0`, as quilt applies it.
+  for f in $(sed -n '/^CRLF_FILES/,/^$/p' .github/local/Makefile.local | grep -o 'src/[^ \\]*'); do
+    [ -f "${f}" ] || die "aic8800: CRLF_FILES names ${f}, which does not exist"
+    sed -i 's/\r$//' "${f}"
+  done
+  while read -r p; do
+    case "${p}" in ''|'#'*) continue ;; esac
+    patch -p1 --fuzz=0 -N -s --no-backup-if-mismatch < "debian/patches/${p}" \
+      || die "aic8800: debian/patches/${p} did not apply"
+    n=$((n + 1))
+  done < debian/patches/series
+  [ "${n}" -gt 0 ] || die "aic8800: debian/patches/series is empty"
+  log "applied ${n} patches of debian/patches/series"
+
+  # Then the patches of other projects, unchanged (patches/upstream/series),
+  # then ours (patches/series) on top. The order matters: each step is made
+  # against the tree with the steps before it applied.
   series_load "${up}" \
     || die "aic8800: patches/upstream/series is missing, empty or malformed"
   while read -r e r; do root[${e}]=${r}; done < <(aic8800_upstream_roots "${up}/series")
-  cd "${dir}"
   for p in "${SERIES[@]}"; do
     r="${root[${p}]:-.}"
     case "/${r}/" in //*|*/../*) die "aic8800: upstream/${p}: root '${r}' is not inside the tree" ;; esac
@@ -91,14 +110,24 @@ stage_fetch_aic8800() {
     log "applied upstream/${p}"
   done
 
-  # `git apply` is exact on context, so the order is not cosmetic.
-  series_load "${ROOT_DIR}/out-of-tree/aic8800/patches" \
+  # `git apply` is exact on context, so the order is not cosmetic. Inside a
+  # repository it skips, without a word, paths outside the current directory;
+  # the ceiling keeps it from finding a repository above the tree.
+  series_load "${pdir}" \
     || die "aic8800: patches/series is missing, empty or malformed"
   for p in "${SERIES[@]}"; do
-    git apply --whitespace=nowarn "${ROOT_DIR}/out-of-tree/aic8800/patches/${p}" \
+    GIT_CEILING_DIRECTORIES="${tree%/*}" git apply --whitespace=nowarn "${pdir}/${p}" \
       || die "aic8800: ${p} did not apply"
     log "applied ${p}"
   done
+}
+
+stage_fetch_aic8800() {
+  mkdir -p "${WORK_DIR}"
+  local dir="${WORK_DIR}/aic8800"
+  git_fetch_pinned "${AIC8800_URL}" "${AIC8800_COMMIT}" "${dir}"
+  log "aic8800 at ${AIC8800_COMMIT} (tag ${AIC8800_TAG}, verified)"
+  aic8800_prepare_tree "${dir}" "${ROOT_DIR}/out-of-tree/aic8800/patches"
 }
 
 # Build the two modules against the kernel tree. Needs the kernel build to have

@@ -8,9 +8,7 @@ indoor or power limits). "iw reg get" shows "phy#0 (self-managed)" and
 the regulatory database governs nothing on this radio.
 
 Default custregd to false, so cfg80211 resolves the domain, and say so
-in the parameter help. Also drop the write of
-REGULATORY_IGNORE_STALE_KICKOFF, which the kernel no longer defines
-(rwnx_compat.h defines it to 0).
+in the parameter help.
 
 With custregd off, rwnx_reg_notifier() calls regulatory_hint() and sends
 the country to the firmware for all parts, and the private country-set
@@ -20,7 +18,7 @@ applies until one is hinted (iw reg set, supplicant country=).
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c
-index d386706..6c426f6 100644
+index a1e96e4..e3c104d 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c
 @@ -56,7 +56,7 @@ struct rwnx_mod_params rwnx_mod_params = {
@@ -44,18 +42,3 @@ index d386706..6c426f6 100644
  
  module_param_named(custchan, rwnx_mod_params.custchan, bool, S_IRUGO);
  MODULE_PARM_DESC(custchan,
-@@ -1839,9 +1842,11 @@ void rwnx_custregd(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
- // For older kernel version, the custom regulatory is applied before the wiphy
- // registration (in rwnx_set_wiphy_params()), so nothing has to be done here
- 
--#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
--	wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
--#endif
-+	/* REGULATORY_IGNORE_STALE_KICKOFF is not written here. The symbol no longer
-+	 * exists in the kernel this module is built against, and rwnx_compat.h
-+	 * defines it to 0 for exactly that case, so the assignment would OR in a
-+	 * zero and have no effect.
-+	 */
- 	if (!rwnx_hw->mod_params->custregd)
- 		return;
- 

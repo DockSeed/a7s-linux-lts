@@ -10,13 +10,14 @@
 #   sudo a7s-kernel-update v6.18.63-R1  this release
 #   sudo a7s-kernel-update v6.18.63-T1  a published test build (pre-release)
 #
-# It downloads SHA256SUMS of the release, takes the names of the three packages
-# (linux-image, linux-headers, a7s-kernel-hook) from it, downloads them to a new
+# It downloads SHA256SUMS of the release, takes the names of the packages
+# (linux-image, linux-headers, a7s-kernel-hook, a7s-aic8800-dkms) from it, downloads them to a new
 # directory below /var/cache/a7s-kernel-update, checks their sha256 (a mismatch
 # removes everything and stops) and installs them with apt-get; a7s-kernel-hook
 # only if the release has a newer one than the installed (a test build's
 # 6.18.60~t1 is older than the release 6.18.60-1), and in a call of its
-# own before the kernel packages, so that its files are configured (a board
+# own before the kernel packages; then the WLAN driver a7s-aic8800-dkms, if the
+# release has it in another version than the installed, also on its own, so that its files are configured (a board
 # without the package has only unconfigured copies of the wrappers in /etc) and
 # stay installed if the kernel packages fail. The hooks of that
 # package make the kernel the next boot; this script reads the result from
@@ -49,7 +50,7 @@ a7s-kernel-update -- install the newest kernel release of a7s-linux-lts
   sudo a7s-kernel-update v6.18.63-R1  this release
   sudo a7s-kernel-update v6.18.63-T1  a test build (a published pre-release)
 
-1. It downloads the three packages of the release and checks their sha256.
+1. It downloads the packages of the release and checks their sha256.
 2. It installs them; a7s-kernel-hook makes the new kernel the next boot.
 3. It says whether the new kernel starts at the next boot: then run
    sudo reboot
@@ -121,15 +122,21 @@ headers="$(pick '^linux-headers-[0-9.]+-[rt][0-9]+_[0-9A-Za-z.+-]+_arm64\.deb$' 
 hook="$(pick '^a7s-kernel-hook_[0-9A-Za-z.+-]+_all\.deb$' "the a7s-kernel-hook package" "releases before v6.18.59-R2 do not have it${tag:+; run sudo a7s-kernel-update without a tag for the newest release}")"
 rel="${image#linux-image-}"
 rel="${rel%%_*}"
+# The WLAN driver; releases before v6.18.64-R1 do not have it.
+driver="$(awk '$2 ~ /^a7s-aic8800-dkms_[0-9A-Za-z.+-]+_all\.deb$/ { print $2 }' "${work}/SHA256SUMS")"
+[ "$(printf '%s\n' "${driver}" | grep -c .)" -le 1 ] || die "this release has more than one a7s-aic8800-dkms package; nothing was changed"
+driver_ver="${driver#a7s-aic8800-dkms_}"; driver_ver="${driver_ver%_all.deb}"
+driver_current=1
+[ -z "${driver}" ] || [ "$(installed_version a7s-aic8800-dkms | tr '~' '.')" = "${driver_ver}" ] || driver_current=0
 
 image_installed="$(installed_version "linux-image-${rel}")"
-if [ -n "${image_installed}" ] && [ "$(default_kernel)" = "/boot/vmlinuz-${rel}" ]; then
+if [ -n "${image_installed}" ] && [ "$(default_kernel)" = "/boot/vmlinuz-${rel}" ] && [ "${driver_current}" = 1 ]; then
 	say "already up to date: kernel ${rel} is installed and starts at the next boot."
 	exit 0
 fi
 
 say "downloading kernel ${rel}"
-for f in ${image} ${headers} ${hook}; do
+for f in ${image} ${headers} ${hook} ${driver}; do
 	fetch "${base}/${f}" "${work}/${f}"
 	awk -v f="${f}" '$2 == f' "${work}/SHA256SUMS" >> "${work}/SUMS"
 done
@@ -157,6 +164,11 @@ apt_install() {  # <option> <file>...
 if [ -n "${hook_file}" ] && ! apt_install "" "${work}/${hook_file}"; then
 	keep=1
 	die "installing ${hook_file} failed; nothing else was changed, the next start still uses $(default_kernel | sed 's#^/boot/vmlinuz-##'). The downloaded packages are in ${work}."
+fi
+# The driver before the kernel packages: setting up the headers then builds it.
+if [ "${driver_current}" = 0 ] && ! apt_install "" "${work}/${driver}"; then
+	keep=1
+	die "installing ${driver} failed; the kernel packages were not installed, the next start still uses $(default_kernel | sed 's#^/boot/vmlinuz-##'). Look at: dkms status. The downloaded packages are in ${work}."
 fi
 reinstall=""
 [ -z "${image_installed}" ] || reinstall="--reinstall"

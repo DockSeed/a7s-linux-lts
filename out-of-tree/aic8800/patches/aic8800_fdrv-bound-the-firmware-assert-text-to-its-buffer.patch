@@ -12,10 +12,10 @@ Clamp the length to 255 characters.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
-index 5a874c4..c98c4cf 100644
+index 0d24d78..cf1c0d7 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
-@@ -1644,9 +1644,12 @@ static inline int rwnx_fw_assert_ind(struct rwnx_hw *rwnx_hw,
+@@ -1646,9 +1646,12 @@ static inline int rwnx_fw_assert_ind(struct rwnx_hw *rwnx_hw,
  {
      struct fw_assert_info_ind *ind = (struct fw_assert_info_ind *)msg->param;
      uint8_t buffer[256];

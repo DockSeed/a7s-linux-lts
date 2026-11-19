@@ -19,7 +19,7 @@ confirmations) and rx_loader_cmd_timeouts (0444).
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
-index 223cfc8..b039eae 100644
+index 25f2626..e1afe3e 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
 @@ -44,6 +44,16 @@ static void cmd_complete(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)

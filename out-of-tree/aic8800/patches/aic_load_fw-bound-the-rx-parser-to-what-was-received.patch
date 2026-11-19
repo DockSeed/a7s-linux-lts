@@ -1,26 +1,24 @@
 From: DockSeed <dockseed@proton.me>
-Subject: [PATCH] aic_load_fw: bound the rx parser and message dispatch to what
- was received
+Subject: [PATCH] aic_load_fw: bound the rx parser to what was received
 
 aicwf_process_rxframes() does not check frame lengths against skb->len.
 skb_pull() of more than skb->len returns NULL and pulls nothing; the
 return value is ignored, so the loop reads the same header again and
 allocates a new skb_inblock on each pass until memory is exhausted. It
 can also free skb_inblock twice and return without atomic_dec(rx_cnt).
-rwnx_rx_handle_msg() indexes msg_hdlrs[], which holds only TASK_DBG,
-with values from the message, so it can read a NULL slot or past the
-array.
 
 Check each header against the bytes left and drop the rest of the buffer
 on a frame that does not fit. Skip data frames without allocating, free
-the config copy after use, clamp param_len, and bound both indexes.
+the config copy after use, and clamp param_len to the frame. Messages
+without a handler slot count in rx_loader_foreign_msgs; the slot check
+itself is in fix-usb-fw-msg-index-checks.
 New parameters: rx_loader_frames_dropped, rx_loader_foreign_msgs and
 rx_loader_inject_bad_len (0644).
 
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
-index 495e192..411a49a 100644
+index 8c5e553..ed846b3 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
 @@ -33,6 +33,17 @@ module_param(adap_test, int, 0660);
@@ -159,10 +157,10 @@ index 6bbe19f..0115e9a 100644
          atomic_dec(&rx_priv->rx_cnt);
      }
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
-index 2a48e65..48bb8c8 100644
+index a890a05..1c7371a 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
-@@ -450,10 +450,22 @@ static msg_cb_fct *msg_hdlrs[] = {
+@@ -465,6 +465,8 @@ static msg_cb_fct *msg_hdlrs[] = {
      [TASK_DBG]   = dbg_hdlrs,
  };
  
@@ -170,20 +168,13 @@ index 2a48e65..48bb8c8 100644
 +
  void rwnx_rx_handle_msg(struct aic_usb_dev *usbdev, struct ipc_e2a_msg *msg)
  {
--    usbdev->cmd_mgr.msgind(&usbdev->cmd_mgr, msg,
--                            msg_hdlrs[MSG_T(msg->id)][MSG_I(msg->id)]);
-+    msg_cb_fct *hdlrs = NULL;
-+    msg_cb_fct cb = NULL;
-+
-+    /* msg_hdlrs[] holds TASK_DBG only; a live-firmware message for TASK_MM went
-+     * through its NULL slot, any other task past the array. dbg_hdlrs[] bounds MSG_I. */
-+    if (MSG_T(msg->id) < ARRAY_SIZE(msg_hdlrs))
-+        hdlrs = msg_hdlrs[MSG_T(msg->id)];
-+    if (hdlrs && MSG_I(msg->id) < ARRAY_SIZE(dbg_hdlrs))
-+        cb = hdlrs[MSG_I(msg->id)];
+     /* firmware-supplied id indexes the handler tables */
+@@ -473,6 +475,8 @@ void rwnx_rx_handle_msg(struct aic_usb_dev *usbdev, struct ipc_e2a_msg *msg)
+ 
+     if (t == TASK_DBG && i < ARRAY_SIZE(dbg_hdlrs))
+         cb = dbg_hdlrs[i];
 +    else
 +        rx_loader_foreign_msgs++;
-+    usbdev->cmd_mgr.msgind(&usbdev->cmd_mgr, msg, cb);
+     (void)msg_hdlrs;
+     usbdev->cmd_mgr.msgind(&usbdev->cmd_mgr, msg, cb);
  }
- 
- 

@@ -10,7 +10,7 @@ Print cache_mem_addr.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c
-index e322d01..1631534 100644
+index a29a4e0..afa60f7 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_compat_8800d80.c
 @@ -349,7 +349,7 @@ int system_config_8800d80(struct aic_usb_dev *usb_dev){

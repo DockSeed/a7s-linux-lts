@@ -28,7 +28,7 @@ index 1e5c254..feec72e 100644
  }
  						
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
-index 211e352..675da64 100644
+index 27adde5..ab01720 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
 @@ -1467,8 +1467,8 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)

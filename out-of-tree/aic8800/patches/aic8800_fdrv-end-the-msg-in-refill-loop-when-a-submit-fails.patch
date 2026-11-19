@@ -18,10 +18,10 @@ is scheduled as well, and it now also refills the msg-in URBs.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index a6e2384..6b593af 100644
+index 965ad7c..5aae644 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-@@ -939,6 +939,7 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
+@@ -936,6 +936,7 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
      skb = __dev_alloc_skb(AICWF_USB_MSG_MAX_PKT_SIZE, GFP_ATOMIC);
      if (!skb) {
          aicwf_usb_msg_rx_buf_put(usb_dev, usb_buf);
@@ -29,7 +29,7 @@ index a6e2384..6b593af 100644
          return -1;
      }
  
-@@ -960,7 +961,9 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
+@@ -957,7 +958,9 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
          usb_buf->skb = NULL;
          aicwf_usb_msg_rx_buf_put(usb_dev, usb_buf);
  
@@ -40,7 +40,7 @@ index a6e2384..6b593af 100644
      }
      return 0;
  }
-@@ -978,8 +981,7 @@ static void aicwf_usb_msg_rx_submit_all_urb(struct aic_usb_dev *usb_dev)
+@@ -975,8 +978,7 @@ static void aicwf_usb_msg_rx_submit_all_urb(struct aic_usb_dev *usb_dev)
      while((usb_buf = aicwf_usb_msg_rx_buf_get(usb_dev)) != NULL) {
          if (aicwf_usb_submit_msg_rx_urb(usb_dev, usb_buf)) {
              AICWFDBG(LOGERROR, "usb msg rx refill fail\n");
@@ -50,7 +50,7 @@ index a6e2384..6b593af 100644
          }
      }
  }
-@@ -2060,6 +2062,10 @@ static void aicwf_usb_rx_refill_retry(struct work_struct *work)
+@@ -2057,6 +2059,10 @@ static void aicwf_usb_rx_refill_retry(struct work_struct *work)
      if (usb_dev->state != USB_UP_ST)
          return;
      aicwf_usb_rx_submit_all_urb(usb_dev);

@@ -19,10 +19,10 @@ code itself is not changed.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-index e670259..b72c1fb 100644
+index e040622..8e6c37e 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -8998,6 +8998,15 @@ if((g_rwnx_plat->usbdev->chipid == PRODUCT_ID_AIC8801) ||
+@@ -9218,6 +9218,15 @@ if((g_rwnx_plat->usbdev->chipid == PRODUCT_ID_AIC8801) ||
  		}
  	}
  
@@ -38,7 +38,7 @@ index e670259..b72c1fb 100644
      wiphy->interface_modes =
      BIT(NL80211_IFTYPE_STATION)     |
      BIT(NL80211_IFTYPE_AP)          |
-@@ -9009,7 +9018,13 @@ if((g_rwnx_plat->usbdev->chipid == PRODUCT_ID_AIC8801) ||
+@@ -9229,7 +9238,13 @@ if((g_rwnx_plat->usbdev->chipid == PRODUCT_ID_AIC8801) ||
      BIT(NL80211_IFTYPE_P2P_DEVICE)  |
      #endif
      #endif

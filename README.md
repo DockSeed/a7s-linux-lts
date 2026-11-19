@@ -98,13 +98,14 @@ Attached to a release:
 | `linux-image-<release>_<version>_arm64.deb` | `/boot/vmlinuz-<release>` (the raw `Image`), `config-`, `System.map-`, the modules in `/lib/modules/<release>`, the device trees in `/usr/lib/linux-image-<release>/allwinner/` |
 | `linux-headers-<release>_<version>_arm64.deb` | `/usr/src/linux-headers-<release>` with `Module.symvers` and the scripts built for arm64, `/lib/modules/<release>/build` pointing to it; for DKMS and `make -C /lib/modules/<release>/build M=...` on the board |
 | `a7s-kernel-hook_<version>_all.deb` | `/usr/sbin/a7s-kernel-update` (downloads and installs a release) and hooks in `/usr/share/kernel` (with wrappers for the headers package in `/etc/kernel`): after an install they make the new kernel the default entry of `/boot/extlinux/extlinux.conf` and the kernel that booted well the safe-mode entry, not if the WLAN driver would be lost; they refuse to remove either (see [docs/kernel.md](docs/kernel.md)). Its version is the one of the kernel packages |
+| `a7s-aic8800-dkms_<version>_all.deb` | the AIC8800 WLAN/BT driver source for DKMS ([out-of-tree/aic8800/README.md](out-of-tree/aic8800/README.md)); DKMS builds it when a kernel's headers are set up. Its version is the one of the kernel packages |
 | `Image`, `sun60i-a733-cubie-a7s.dtb`, `config`, `System.map` | as `./build.sh` leaves them in `out/` |
 | `a7s-linux-lts-<release>-modules.tar.xz` | the kernel's modules, `lib/modules/<release>/`, `depmod` run over the set |
 | `KERNEL-ID` | the build identity, with the sha256 of the four files above, and the line `release_modules=without_aic8800` |
 | `linux-<version>.tar.xz` | the unchanged kernel tarball from cdn.kernel.org |
 | `SHA256SUMS` | the sha256 of every file above |
 
-The WLAN/BT driver is not part of the releases (the image recipe builds it).
+The driver's firmware is not part of the releases (the image recipe fetches it).
 The packages are named for the release, so a newer one installs beside an older
 one and the older kernel stays bootable. On a board, `sudo a7s-kernel-update` downloads and installs the newest release
 (or the one named, `v6.18.63-R1`), and the hook makes the new kernel the next

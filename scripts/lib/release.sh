@@ -153,6 +153,18 @@ stage_package() {
   done
   cp "$(deb_dir)/${hook}" "${dest}/$(release_file_name "${hook}")"
 
+  # The driver source for DKMS, with the firmware link and its copyright file.
+  local dk; dk="$(dkms_deb_name)"
+  [ -f "$(deb_dir)/${dk}" ] || die "package: $(deb_dir)/${dk} is missing -- run deb first"
+  [ "$(dpkg-deb -f "$(deb_dir)/${dk}" Version)" = "${ver}" ] || die "package: ${dk}: wrong Version"
+  local ldk; ldk="$(dpkg-deb -c "$(deb_dir)/${dk}")" || die "package: cannot list ${dk}"
+  for f in "usr/src/${DKMS_MODULE}-${ver}/dkms.conf" "usr/share/doc/${DKMS_PACKAGE}/copyright" \
+           "usr/lib/firmware/aic8800_fw/USB/aic8800D80 -> ../../aic8800D80"; do
+    grep -qF " ./${f}" <<<"${ldk}" || die "package: ${dk} has no /${f}"
+  done
+  ! grep -qE '\.(ko|o|bin)$' <<<"${ldk}" || die "package: ${dk} carries built objects or firmware"
+  cp "$(deb_dir)/${dk}" "${dest}/$(release_file_name "${dk}")"
+
   # Same bytes for the same inputs: sorted names, no owners, the build time as mtime.
   local mods="a7s-linux-lts-${rel}-modules.tar.xz"
   tar --sort=name --owner=0 --group=0 --numeric-owner --format=gnu \

@@ -77,7 +77,7 @@ index b848421..9c47e07 100644
                      memcpy(msg, data, aggr_len + 4);
  
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index 4159742..7c6f940 100644
+index b0faae6..cc27dd3 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 @@ -56,6 +56,44 @@ bool aicwf_usb_rx_aggr = false;

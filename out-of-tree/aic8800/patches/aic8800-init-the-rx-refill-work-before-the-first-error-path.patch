@@ -18,7 +18,7 @@ the next aicwf_usb_init() fail one allocation, once: 1 rx URBs, 2 tx URBs,
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index 5f62a7f..b368165 100644
+index 8db2e01..80aeda7 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 @@ -2039,9 +2039,17 @@ static void aicwf_usb_msg_rx_urb_work(struct work_struct *work)

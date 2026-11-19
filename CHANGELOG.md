@@ -15,6 +15,14 @@ may be short).
 
 ## [Unreleased]
 
+### Added
+
+- `a7s-aic8800-dkms`, the WLAN/BT driver source for DKMS, is a release
+  file. `a7s-kernel-update` installs it before the kernel packages, so a
+  board gets a new driver without a new image. It links
+  `/usr/lib/firmware/aic8800_fw/USB/aic8800D80`, where the `-11` driver opens
+  the firmware, to `/usr/lib/firmware/aic8800D80`.
+
 ### Fixed
 
 - USB host on the A733: the HCI interface register selects AHB INCR16 bursts
@@ -29,9 +37,8 @@ may be short).
   frames, A-MSDU subframes, firmware messages and their table indexes, scan
   results, association IEs, QoS TIDs), and the error paths of rx refill,
   bulk-in errors, tx drops and rx defragmentation no longer sleep in atomic
-  context, leak or use freed memory (patches 20-38 in
-  `out-of-tree/aic8800/README.md`). New counters `rx_bad_frame_drops` and
-  `rx_unknown_msgs`.
+  context, leak or use freed memory (`out-of-tree/aic8800/README.md`). New
+  counter `rx_bad_frame_drops`.
 
 ### Changed
 
@@ -41,6 +48,11 @@ may be short).
   upload fix and Jiali Chen's `fix-usb-suspend-reboot-hang`. What we changed
   in them is a patch of our own on top. Feng Zhang's PCIe and SDIO hunks now
   apply too (not built). Our patch messages are shorter.
+- aic8800: the source is Radxa's `5.0+git20260123.5f7be68d-11` as shipped
+  (its `debian/patches/series`, with Feng Zhang's and Jiali Chen's patches),
+  plus radxa-pkg/aic8800 pull requests 114 (16 of 17) and 106 unchanged.
+  Seven of our patches and the compat patch are dropped, one is added. The
+  counter `rx_unknown_msgs` is gone.
 
 ## [6.18.63-R2] - 2026-11-15
 

@@ -19,12 +19,12 @@
 #   all             fetch + apply-patches + build
 #   key             print the identity of this checkout's kernel (cache key)
 #   deb             after build: the kernel as Debian packages (linux-image,
-#                   linux-headers) and a7s-kernel-hook in OUT_DIR/deb; needs
-#                   A7S_KERNEL_REVISION
+#                   linux-headers), a7s-kernel-hook and a7s-aic8800-dkms in
+#                   OUT_DIR/deb; needs A7S_KERNEL_REVISION
 #   hook            the a7s-kernel-hook package (extlinux entries for installed
 #                   kernels) in OUT_DIR/deb; needs A7S_KERNEL_REVISION, no build
 #   package         after build and deb: the release files in OUT_DIR/release
-#                   (loose files, modules, the two packages, SHA256SUMS)
+#                   (loose files, modules, the packages, SHA256SUMS)
 #
 # Needs an aarch64 cross compiler (none on an aarch64 host), make, patch, bc,
 # bison, flex, libssl, libelf, kmod, xz, git and curl (container/packages.txt
@@ -59,6 +59,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${ROOT_DIR}/scripts/lib/deb.sh"
 # shellcheck source=lib/hook.sh
 . "${ROOT_DIR}/scripts/lib/hook.sh"
+# shellcheck source=lib/dkms.sh
+. "${ROOT_DIR}/scripts/lib/dkms.sh"
 # shellcheck source=lib/release.sh
 . "${ROOT_DIR}/scripts/lib/release.sh"
 

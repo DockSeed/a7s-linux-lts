@@ -1,0 +1,29 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] aic8800_fdrv: bound the AP entry to sta_flowctrl[] in
+ sm_connect_ind
+
+rwnx_rx_sm_connect_ind() reads sta_flowctrl[sta->sta_idx] for the AP
+entry. ap_idx comes from the device and is checked against sta_table[]
+(NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX entries), but sta_flowctrl[] has
+only NX_REMOTE_STA_MAX entries, so an AP index in the last
+NX_VIRT_DEV_MAX slots reads past it.
+
+Read the pending count only for an index below NX_REMOTE_STA_MAX.
+
+Assisted-by: Claude
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index cf1c0d7..036353d 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -998,7 +998,9 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
+             rwnx_vif->tdls_chsw_prohibited = extcap->ext_capab[4] & WLAN_EXT_CAPA5_TDLS_CH_SW_PROHIBITED;
+         }
+ 
+-		if(atomic_read(&rwnx_hw->sta_flowctrl[sta->sta_idx].tx_pending_cnt) > 0) {
++		/* sta_flowctrl[] has only NX_REMOTE_STA_MAX entries */
++		if(sta->sta_idx < NX_REMOTE_STA_MAX &&
++		   atomic_read(&rwnx_hw->sta_flowctrl[sta->sta_idx].tx_pending_cnt) > 0) {
+ 			AICWFDBG(LOGDEBUG, "sta idx %d fc error %d\n",  sta->sta_idx,  atomic_read(&rwnx_hw->sta_flowctrl[sta->sta_idx].tx_pending_cnt));
+ 		}
+ 

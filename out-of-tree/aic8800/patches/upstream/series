@@ -1,17 +1,48 @@
-# Patches from other projects, byte for byte as published. Applied before ours
-# (../series), each with `patch -p1 --fuzz=0`; for a target file with CRLF line
-# ends the hunk lines get CRLF at apply time. "# root:" names the directory a
-# patch applies from when its paths do not start at the tree root.
+# Patches from other projects, byte for byte as published. Applied after
+# Radxa's debian/patches/series of the pin and before ours (../series), each
+# with `patch -p1 --fuzz=0`; for a target file with CRLF line ends the hunk
+# lines get CRLF at apply time. "# root:" names the directory a patch applies
+# from when its paths do not start at the tree root.
 
-# Feng Zhang <feng@radxa.com>, radxa-pkg/aic8800 df4c783b663eba1956579c681acd5e45f25c671d
-# debian/patches/fix-Lower-the-debugging-log-level.patch
-fix-Lower-the-debugging-log-level.patch
+# PR #114 radxa-pkg/aic8800 (N Oliver/PixnBits), at 41e091b4dade08e2473a8403153ce2e9ea8a6f8d, without fix-usb-rx-aggregate-length-checks
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-rx-tid-and-header-length.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-priv-cmd-cap-net-admin.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-fw-msg-index-checks.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-cfm-copy-length.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-rx-aggregate-length-checks.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-unknown-freq-bug-on.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-bt-patch-table-parser.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-usb-cfm-copy-length.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-rx-qos-header-length-and-usb-tid-checks.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-mesh-msg-index-checks.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-usb-fw-msg-index-checks.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-usb-bt-patch-table-parsers.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-prealloc-rx-length-checks.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-sdio-rx-length-wrap.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-ext-patch-count-bounds.patch
+# https://github.com/radxa-pkg/aic8800/pull/114
+fix-cmd-alloc-failure.patch
+
+# PR #106 radxa-pkg/aic8800 (Pranav0-0Aggarwal), 113d556207e61981ad571aaabb74856f0195a444
+# https://github.com/radxa-pkg/aic8800/pull/106
+fix-usb-drop-trace_printk.patch
 
 # bnister, shenmintao/aic8800d80 commit f36a0afeb43ae05725b31fc954d283f46e054b7d
 # https://github.com/shenmintao/aic8800d80/pull/35
 # root: src/USB/driver_fw
 bluetooth-fw-upload-fix-chip-mcu-id-needs-cache-mem-addr.patch
-
-# Jiali Chen <chenjiali@radxa.com>, radxa-pkg/aic8800 commit eff26bd6c99c0767e6f9a0e4c84509f2d569b153
-# debian/patches/fix-usb-suspend-reboot-hang.patch
-fix-usb-suspend-reboot-hang.patch

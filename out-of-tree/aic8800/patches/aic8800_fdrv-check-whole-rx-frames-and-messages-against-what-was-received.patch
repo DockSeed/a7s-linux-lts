@@ -205,44 +205,50 @@ index ebabd81..558c58a 100644
              if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
                  aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
-index e8d8451..5a874c4 100644
+index 77f4093..0d24d78 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
-@@ -1736,11 +1736,12 @@ static const struct rwnx_msg_hdlrs msg_hdlrs[] = {
+@@ -1729,6 +1729,8 @@ static msg_cb_fct *msg_hdlrs[] = {
+ #endif /* CONFIG_RWNX_FULLMAC */
  };
  
- extern uint rx_unknown_msgs;
 +extern uint rx_bad_frame_drops;
- 
++
  /**
   *
   */
+@@ -1870,7 +1872,7 @@ static bool rwnx_fw_msg_valid(struct rwnx_hw *rwnx_hw, const struct ipc_e2a_msg
+ 	return true;
+ }
+ 
 -void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
 +void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg, u32 len)
  {
- 	//printk("%s(%d) MSG_T(msg->id):%d MSG_I(msg->id):%d cmd:%s\r\n", __func__, 
- 	//	msg->id,
-@@ -1750,6 +1751,20 @@ void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
-     unsigned int task = MSG_T(msg->id);
-     unsigned int idx = MSG_I(msg->id);
-     msg_cb_fct cb = NULL;
-+    const u32 hdr = offsetof(struct ipc_e2a_msg, param);
+ 	unsigned int t = MSG_T(msg->id), i = MSG_I(msg->id);
+ 	msg_cb_fct cb = NULL;
+@@ -1880,7 +1882,21 @@ void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
+ 	//	MSG_T(msg->id), 
+ 	//	MSG_I(msg->id),
+ 	//	rwnx_id2str[MSG_T(msg->id)][MSG_I(msg->id)]);
+-	
++	const u32 hdr = offsetof(struct ipc_e2a_msg, param);
 +
-+    /* len is what the frame carried (the copy behind msg is zero-padded to
-+     * a whole ipc_e2a_msg). A frame shorter than the header is not a
-+     * message; param_len is clamped to the frame, so cmd_mgr_msgind()
-+     * copies only what was received. */
-+    if (len < hdr) {
-+        rx_bad_frame_drops++;
-+        return;
-+    }
-+    if (msg->param_len > len - hdr) {
-+        rx_bad_frame_drops++;
-+        msg->param_len = len - hdr;
-+    }
- 
-     /* msg->id comes from the device: only an existing handler slot is
-      * called. A message without one still goes to msgind(), so a command
++	/* len is what the frame carried (the copy behind msg is zero-padded to
++	 * a whole ipc_e2a_msg). A frame shorter than the header is not a
++	 * message; param_len is clamped to the frame, so the checks below and
++	 * cmd_mgr_msgind() see only what was received. */
++	if (len < hdr) {
++		rx_bad_frame_drops++;
++		return;
++	}
++	if (msg->param_len > len - hdr) {
++		rx_bad_frame_drops++;
++		msg->param_len = len - hdr;
++	}
++
+ 	/* the handler tables are indexed by a firmware-supplied id */
+ 	if (t < ARRAY_SIZE(msg_hdlrs) && msg_hdlrs[t] && t < ARRAY_SIZE(msg_hdlrs_n) && i < msg_hdlrs_n[t])
+ 		cb = msg_hdlrs[t][i];
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h
 index b5556d1..d74cb28 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.h

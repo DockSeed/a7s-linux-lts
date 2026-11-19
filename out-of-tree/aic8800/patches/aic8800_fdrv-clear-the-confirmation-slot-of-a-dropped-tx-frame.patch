@@ -20,10 +20,10 @@ aicwf_usb_tx_process() keeps its slot and its sw_txhdr, as before.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index 0c1c50c..1a93c99 100644
+index 8a463db..92cf622 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-@@ -1810,6 +1810,21 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *pkt)
+@@ -1807,6 +1807,21 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *pkt)
  }
  
  #else
@@ -45,7 +45,7 @@ index 0c1c50c..1a93c99 100644
  static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
  {
      u8 *buf;
-@@ -1833,6 +1848,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+@@ -1830,6 +1845,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
  
      if (usb_dev->state != USB_UP_ST) {
          usb_err("usb state is not up!\n");
@@ -54,7 +54,7 @@ index 0c1c50c..1a93c99 100644
          kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
          dev_kfree_skb_any(skb);
          return -EIO;
-@@ -1842,6 +1859,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
+@@ -1839,6 +1856,8 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
                          &usb_dev->tx_free_count, &usb_dev->tx_free_lock);
      if (!usb_buf) {
          usb_err("free:%d, post:%d\n", usb_dev->tx_free_count, usb_dev->tx_post_count);
@@ -63,7 +63,7 @@ index 0c1c50c..1a93c99 100644
          kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
          dev_kfree_skb_any(skb);
          ret = -ENOMEM;
-@@ -1982,6 +2001,7 @@ drop:
+@@ -1979,6 +1998,7 @@ drop:
       */
      if (need_cfm) {
          kfree(buf);

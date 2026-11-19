@@ -20,10 +20,10 @@ aic_load_fw is not changed.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index f77141d..a6e2384 100644
+index b86a6a4..965ad7c 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-@@ -305,6 +305,19 @@ static void aicwf_usb_tx_complete(struct urb *urb)
+@@ -302,6 +302,19 @@ static void aicwf_usb_tx_complete(struct urb *urb)
      spin_unlock_irqrestore(&usb_dev->tx_flow_lock, flags);
  }
  
@@ -43,7 +43,7 @@ index f77141d..a6e2384 100644
  void aicwf_usb_rx_submit_all_urb_(struct aic_usb_dev *usb_dev);
  
  #ifdef CONFIG_PREALLOC_RX_SKB
-@@ -814,7 +827,8 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
+@@ -811,7 +824,8 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
          aicwf_prealloc_rxbuff_free(rx_buff, &usb_dev->rx_priv->rxbuff_lock);
          aicwf_usb_rx_buf_put(usb_dev, usb_buf);
  
@@ -53,7 +53,7 @@ index f77141d..a6e2384 100644
  	    return -1;
      }else{
      	atomic_inc(&rx_urb_cnt);
-@@ -2010,6 +2024,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
+@@ -2007,6 +2021,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
      if (usb_dev->state == USB_DOWN_ST)
          return;
  
@@ -61,7 +61,7 @@ index f77141d..a6e2384 100644
      aicwf_usb_state_change(usb_dev, USB_DOWN_ST);
      //aicwf_usb_cancel_all_urbs(usb_dev);//AIDEN
  }
-@@ -2017,6 +2032,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
+@@ -2014,6 +2029,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
  static void aicwf_usb_deinit(struct aic_usb_dev *usbdev)
  {
      cancel_work_sync(&usbdev->rx_urb_work);
@@ -69,7 +69,7 @@ index f77141d..a6e2384 100644
      aicwf_usb_free_urb(&usbdev->rx_free_list, &usbdev->rx_free_lock);
      aicwf_usb_free_urb(&usbdev->tx_free_list, &usbdev->tx_free_lock);
  #ifdef CONFIG_USB_MSG_IN_EP
-@@ -2036,6 +2052,16 @@ static void aicwf_usb_rx_urb_work(struct work_struct *work)
+@@ -2033,6 +2049,16 @@ static void aicwf_usb_rx_urb_work(struct work_struct *work)
      aicwf_usb_rx_submit_all_urb(usb_dev);
  }
  
@@ -86,7 +86,7 @@ index f77141d..a6e2384 100644
  #ifdef CONFIG_USB_MSG_IN_EP
  static void aicwf_usb_msg_rx_urb_work(struct work_struct *work)
  {
-@@ -2069,6 +2095,7 @@ static int aicwf_usb_init(struct aic_usb_dev *usb_dev)
+@@ -2066,6 +2092,7 @@ static int aicwf_usb_init(struct aic_usb_dev *usb_dev)
  #endif
      /* Before the first `goto error`: aicwf_usb_deinit() cancels these works. */
      INIT_WORK(&usb_dev->rx_urb_work, aicwf_usb_rx_urb_work);
@@ -95,10 +95,10 @@ index f77141d..a6e2384 100644
  	if(usb_dev->msg_in_pipe){
  		INIT_WORK(&usb_dev->msg_rx_urb_work, aicwf_usb_msg_rx_urb_work);
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
-index 7353999..ae385c0 100644
+index d9e4b35..0e6760d 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
-@@ -128,6 +128,7 @@ struct aic_usb_dev {
+@@ -130,6 +130,7 @@ struct aic_usb_dev {
  
      struct usb_anchor rx_submitted;
      struct work_struct rx_urb_work;

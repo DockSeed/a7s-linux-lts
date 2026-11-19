@@ -14,7 +14,7 @@ restarts.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index 7c6f940..5f62a7f 100644
+index cc27dd3..8db2e01 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 @@ -64,6 +64,9 @@ MODULE_PARM_DESC(rx_urb_errors, "Bulk-IN rx URBs that completed with an error");

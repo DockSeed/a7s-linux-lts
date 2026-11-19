@@ -63,7 +63,7 @@ index d566a11..1759878 100644
  {
      return bus->ops->start(bus->dev);
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
-index 638853f..4f2b712 100644
+index e5a10af..a1d6f15 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
 @@ -306,7 +306,7 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev

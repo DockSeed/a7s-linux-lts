@@ -18,10 +18,10 @@ as before.
 Assisted-by: Claude
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-index 6b593af..ed79eff 100644
+index 5aae644..854d3a4 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
-@@ -318,6 +318,26 @@ static inline void aicwf_usb_rx_retry_later(struct aic_usb_dev *usb_dev)
+@@ -315,6 +315,26 @@ static inline void aicwf_usb_rx_retry_later(struct aic_usb_dev *usb_dev)
                                msecs_to_jiffies(AICWF_USB_RX_RETRY_MS));
  }
  
@@ -48,7 +48,7 @@ index 6b593af..ed79eff 100644
  void aicwf_usb_rx_submit_all_urb_(struct aic_usb_dev *usb_dev);
  
  #ifdef CONFIG_PREALLOC_RX_SKB
-@@ -364,6 +384,8 @@ static void aicwf_usb_rx_complete(struct urb *urb)
+@@ -361,6 +381,8 @@ static void aicwf_usb_rx_complete(struct urb *urb)
              AICWFDBG(LOGDEBUG, "%s urb->status:%d \r\n", __func__, urb->status);
              rx_urb_errors++;
              rx_urb_last_status = urb->status;
@@ -57,7 +57,7 @@ index 6b593af..ed79eff 100644
              return;
          }else{
              //schedule_work(&usb_dev->rx_urb_work);
-@@ -648,6 +670,8 @@ static void aicwf_usb_msg_rx_complete(struct urb *urb)
+@@ -645,6 +667,8 @@ static void aicwf_usb_msg_rx_complete(struct urb *urb)
  
  		if(urb->status < 0){
  			AICWFDBG(LOGDEBUG, "%s urb->status:%d \r\n", __func__, urb->status);
@@ -66,7 +66,7 @@ index 6b593af..ed79eff 100644
  			return;
  		}else{
  			aicwf_usb_msg_rx_submit_all_urb_(usb_dev);
-@@ -767,6 +791,8 @@ static void aicwf_usb_msg_rx_complete(struct urb *urb)
+@@ -764,6 +788,8 @@ static void aicwf_usb_msg_rx_complete(struct urb *urb)
              spin_unlock_irqrestore(&rx_priv->msg_rxqlock, flags);
              usb_err("rx_priv->rxq is over flow!!!\n");
              aicwf_dev_skb_free(skb);
