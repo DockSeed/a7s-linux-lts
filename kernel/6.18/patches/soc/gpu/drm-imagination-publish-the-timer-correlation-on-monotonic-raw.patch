@@ -1,0 +1,329 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] drm/imagination: publish the timer correlation on
+ CLOCK_MONOTONIC_RAW
+
+The firmware has no OS clock. It converts ROGUE_CR_TIMER to OS time through
+the newest entry of time_corr[] in struct rogue_fwif_gpu_util_fwcb: an OS
+timestamp, a CR timestamp, the core clock rate and the CR-to-OS factor (the
+comment above ROGUE_FWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT gives the formula).
+The host has to publish those entries. The driver allocates the structure
+because the firmware interface requires it, but never writes an entry.
+
+What that costs, seen on the A733's BXM-4-64 MC1 with firmware
+rogue_36.56.104.183_v1 (v1.1) in a debug build that wraps every job in
+ROGUE_FWIF_CCB_CMD_TYPE_PRE_TIMESTAMP and _POST_TIMESTAMP:
+
+  - without an entry the firmware writes 0 for both;
+  - with one entry per firmware boot it writes OS time in ns, and post never
+    comes before pre;
+  - os_timestamp is the field it uses: os_mono_timestamp, set far apart from
+    it, never showed up in a value;
+  - ROGUE_CR_TIMER is reset again while the firmware starts, at every
+    power-up: an entry is only good for the boot it was taken in.
+
+pvr_fw_time_corr_start() reads ROGUE_CR_TIMER's value field and the OS time
+together and publishes them with the core clock rate and
+K = (256 * NSEC_PER_SEC << ROGUE_FWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT) / rate.
+The entry is complete before time_corr_seq_count selects it. It runs after
+the firmware has booted, from pvr_fw_init() and pvr_power_fw_enable(), which
+covers runtime resume and both reset paths; a reset clears the structure
+together with the other firmware objects. pvr_fw_time_corr_stop() runs before
+the firmware stops and keeps the firmware's last time as the floor of the
+next entry, so the firmware's time does not go backwards across a power cycle.
+
+The OS clock is CLOCK_MONOTONIC_RAW. While systemd-timesyncd was taking up
+the clock after boot, ROGUE_CR_TIMER ran clearly fast against
+CLOCK_MONOTONIC; against CLOCK_MONOTONIC_RAW it stayed within the noise of
+the measurement. A slewed clock would carry that error into every timestamp.
+
+To write the entries the GPU utilisation control block is now created mapped,
+like the other structures the host writes after creation.
+
+Assisted-by: Claude
+---
+--- a/drivers/gpu/drm/imagination/pvr_fw.c
++++ b/drivers/gpu/drm/imagination/pvr_fw.c
+@@ -10,6 +10,8 @@
+ #include "pvr_fw_trace.h"
+ #include "pvr_gem.h"
+ #include "pvr_power.h"
++#include "pvr_rogue_cr_defs.h"
++#include "pvr_rogue_defs.h"
+ #include "pvr_rogue_fwif_dev_info.h"
+ #include "pvr_rogue_heap_config.h"
+ #include "pvr_vm.h"
+@@ -21,8 +23,10 @@
+ #include <linux/clk.h>
+ #include <linux/firmware.h>
+ #include <linux/math.h>
++#include <linux/math64.h>
+ #include <linux/minmax.h>
+ #include <linux/sizes.h>
++#include <linux/timekeeping.h>
+ 
+ #define FW_MAX_SUPPORTED_MAJOR_VERSION 1
+ 
+@@ -505,11 +509,14 @@
+ 		goto err_release_sysdata;
+ 	}
+ 
+-	err = pvr_fw_object_create(pvr_dev, sizeof(struct rogue_fwif_gpu_util_fwcb),
+-				   PVR_BO_FW_FLAGS_DEVICE_UNCACHED,
+-				   fw_gpu_util_fwcb_init, pvr_dev, &fw_mem->gpu_util_fwcb_obj);
+-	if (err) {
++	fw_dev->gpu_util_fwcb = pvr_fw_object_create_and_map(pvr_dev,
++							     sizeof(*fw_dev->gpu_util_fwcb),
++							     PVR_BO_FW_FLAGS_DEVICE_UNCACHED,
++							     fw_gpu_util_fwcb_init, pvr_dev,
++							     &fw_mem->gpu_util_fwcb_obj);
++	if (IS_ERR(fw_dev->gpu_util_fwcb)) {
+ 		drm_err(drm_dev, "Unable to allocate GPU util FWCB\n");
++		err = PTR_ERR(fw_dev->gpu_util_fwcb);
+ 		goto err_release_fault_page;
+ 	}
+ 
+@@ -577,7 +584,7 @@
+ 	pvr_fw_object_destroy(fw_mem->runtime_cfg_obj);
+ 
+ err_release_gpu_util_fwcb:
+-	pvr_fw_object_destroy(fw_mem->gpu_util_fwcb_obj);
++	pvr_fw_object_unmap_and_destroy(fw_mem->gpu_util_fwcb_obj);
+ 
+ err_release_fault_page:
+ 	pvr_fw_object_destroy(fw_mem->fault_page_obj);
+@@ -605,7 +612,7 @@
+ 
+ 	pvr_fw_trace_fini(pvr_dev);
+ 	pvr_fw_object_destroy(fw_mem->runtime_cfg_obj);
+-	pvr_fw_object_destroy(fw_mem->gpu_util_fwcb_obj);
++	pvr_fw_object_unmap_and_destroy(fw_mem->gpu_util_fwcb_obj);
+ 	pvr_fw_object_destroy(fw_mem->fault_page_obj);
+ 	pvr_fw_object_unmap_and_destroy(fw_mem->sysdata_obj);
+ 	pvr_fw_object_unmap_and_destroy(fw_mem->sysinit_obj);
+@@ -923,6 +930,139 @@
+ 	return pvr_fw_get_device_info(pvr_dev);
+ }
+ 
++/*
++ * ROGUE_CR_TIMER advances once every ROGUE_CRTIME_TICK_IN_CYCLES core clock
++ * cycles. The firmware converts a CR timer delta to an OS time delta with the
++ * newest entry of the correlation array as
++ * (delta * factor) >> ROGUE_FWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT, see the
++ * comment above that define.
++ */
++static u64
++pvr_fw_time_corr_factor(u64 core_clock_hz)
++{
++	return div64_u64(((u64)ROGUE_CRTIME_TICK_IN_CYCLES * NSEC_PER_SEC) <<
++			 ROGUE_FWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT, core_clock_hz);
++}
++
++/**
++ * pvr_fw_time_corr_now_ns() - Current time in the clock of the correlation
++ *
++ * The firmware stamps job timestamps in this clock. It is CLOCK_MONOTONIC_RAW:
++ * it is not slewed by time synchronisation, so its rate is the rate of the
++ * crystal both the CPU timer and the GPU clock are derived from.
++ *
++ * Return: The time in ns.
++ */
++u64
++pvr_fw_time_corr_now_ns(void)
++{
++	return ktime_get_raw_ns();
++}
++
++static void
++pvr_fw_time_corr_sample(struct pvr_device *pvr_dev, u64 *cr_out, u64 *os_out)
++{
++	unsigned long flags;
++
++	/* Keep the two reads together. */
++	local_irq_save(flags);
++	*cr_out = pvr_cr_read64(pvr_dev, ROGUE_CR_TIMER) & ~ROGUE_CR_TIMER_VALUE_CLRMSK;
++	*os_out = pvr_fw_time_corr_now_ns();
++	local_irq_restore(flags);
++}
++
++static u64
++pvr_fw_time_corr_estimate(struct pvr_fw_device *fw_dev, u64 cr)
++{
++	return fw_dev->time_corr.os +
++	       mul_u64_u64_shr(cr - fw_dev->time_corr.cr, fw_dev->time_corr.factor,
++			       ROGUE_FWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT);
++}
++
++static void
++pvr_fw_time_corr_publish(struct pvr_device *pvr_dev, u64 cr, u64 os, u64 factor)
++{
++	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
++	struct rogue_fwif_gpu_util_fwcb *util = fw_dev->gpu_util_fwcb;
++	struct rogue_fwif_time_corr *entry;
++	u32 seq;
++
++	lockdep_assert_held(&fw_dev->time_corr.lock);
++
++	seq = READ_ONCE(util->time_corr_seq_count) + 1;
++	entry = &util->time_corr[ROGUE_FWIF_TIME_CORR_CURR_INDEX(seq)];
++	entry->cr_timestamp = cr;
++	entry->os_timestamp = os;
++	entry->os_mono_timestamp = os;
++	entry->cr_delta_to_os_delta_kns = factor;
++	entry->core_clock_speed = clk_get_rate(pvr_dev->core_clk);
++
++	/* The entry has to be complete before the firmware can select it. */
++	wmb();
++	WRITE_ONCE(util->time_corr_seq_count, seq);
++
++	fw_dev->time_corr.cr = cr;
++	fw_dev->time_corr.os = os;
++	fw_dev->time_corr.factor = factor;
++	fw_dev->time_corr.valid = true;
++}
++
++/**
++ * pvr_fw_time_corr_start() - Publish the timer correlation for a booted firmware
++ * @pvr_dev: Target PowerVR device.
++ *
++ * The firmware converts ROGUE_CR_TIMER to OS time through the newest entry of
++ * &rogue_fwif_gpu_util_fwcb.time_corr, for its utilisation states and for the
++ * timestamps of %ROGUE_FWIF_CCB_CMD_TYPE_PRE_TIMESTAMP and
++ * %ROGUE_FWIF_CCB_CMD_TYPE_POST_TIMESTAMP. The host has to publish the
++ * entries. ROGUE_CR_TIMER starts again from zero when the firmware is started,
++ * so every boot needs a new entry.
++ *
++ * The new entry never starts before the last time the previous one could
++ * have produced, so the firmware's timestamps do not go backwards across a
++ * power cycle.
++ *
++ * The firmware must have booted and the GPU must be powered.
++ */
++void
++pvr_fw_time_corr_start(struct pvr_device *pvr_dev)
++{
++	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
++	u64 core_clock_hz = clk_get_rate(pvr_dev->core_clk);
++	u64 cr, os;
++
++	if (WARN_ON(!core_clock_hz))
++		return;
++
++	mutex_lock(&fw_dev->time_corr.lock);
++	pvr_fw_time_corr_sample(pvr_dev, &cr, &os);
++	pvr_fw_time_corr_publish(pvr_dev, cr, max(os, fw_dev->time_corr.floor_ns),
++				 pvr_fw_time_corr_factor(core_clock_hz));
++	mutex_unlock(&fw_dev->time_corr.lock);
++}
++
++/**
++ * pvr_fw_time_corr_stop() - Retire the timer correlation before the firmware stops
++ * @pvr_dev: Target PowerVR device.
++ *
++ * Remembers the firmware's current notion of time as the floor for the entry
++ * of the next boot. The GPU must be powered.
++ */
++void
++pvr_fw_time_corr_stop(struct pvr_device *pvr_dev)
++{
++	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
++	u64 cr, os;
++
++	mutex_lock(&fw_dev->time_corr.lock);
++	if (fw_dev->time_corr.valid) {
++		pvr_fw_time_corr_sample(pvr_dev, &cr, &os);
++		fw_dev->time_corr.floor_ns = max(os, pvr_fw_time_corr_estimate(fw_dev, cr));
++		fw_dev->time_corr.valid = false;
++	}
++	mutex_unlock(&fw_dev->time_corr.lock);
++}
++
+ /**
+  * pvr_fw_init() - Initialise and boot firmware
+  * @pvr_dev: Target PowerVR device
+@@ -964,6 +1104,10 @@
+ 	spin_lock_init(&fw_dev->fw_mm_lock);
+ 
+ 	INIT_LIST_HEAD(&fw_dev->fw_objs.list);
++	err = drmm_mutex_init(from_pvr_device(pvr_dev), &fw_dev->time_corr.lock);
++	if (err)
++		goto err_mm_takedown;
++
+ 	err = drmm_mutex_init(from_pvr_device(pvr_dev), &fw_dev->fw_objs.lock);
+ 	if (err)
+ 		goto err_mm_takedown;
+@@ -1004,6 +1148,8 @@
+ 		goto err_fw_stop;
+ 	}
+ 
++	pvr_fw_time_corr_start(pvr_dev);
++
+ 	WRITE_ONCE(fw_dev->initialised, true);
+ 
+ 	return 0;
+--- a/drivers/gpu/drm/imagination/pvr_fw.h
++++ b/drivers/gpu/drm/imagination/pvr_fw.h
+@@ -367,6 +367,33 @@
+ 	/** @fwif_osdata: Pointer to CPU mapping of FW OSDATA structure. */
+ 	struct rogue_fwif_osdata *fwif_osdata;
+ 
++	/** @gpu_util_fwcb: Pointer to CPU mapping of FW GPU utilisation control structure. */
++	struct rogue_fwif_gpu_util_fwcb *gpu_util_fwcb;
++
++	/**
++	 * @time_corr: State of the timer correlation published in
++	 *             &rogue_fwif_gpu_util_fwcb.time_corr.
++	 */
++	struct {
++		/** @time_corr.lock: Serialises publishing entries. */
++		struct mutex lock;
++
++		/** @time_corr.valid: %true while the newest entry matches the running firmware. */
++		bool valid;
++
++		/** @time_corr.cr: ROGUE_CR_TIMER value of the newest entry. */
++		u64 cr;
++
++		/** @time_corr.os: OS time of the newest entry, in ns. */
++		u64 os;
++
++		/** @time_corr.factor: CR-to-OS conversion factor of the newest entry. */
++		u64 factor;
++
++		/** @time_corr.floor_ns: No entry may start earlier than this OS time, in ns. */
++		u64 floor_ns;
++	} time_corr;
++
+ 	/** @power_sync: Pointer to CPU mapping of power sync state. */
+ 	u32 *power_sync;
+ 
+@@ -403,6 +430,10 @@
+ 
+ int pvr_wait_for_fw_boot(struct pvr_device *pvr_dev);
+ 
++void pvr_fw_time_corr_start(struct pvr_device *pvr_dev);
++void pvr_fw_time_corr_stop(struct pvr_device *pvr_dev);
++u64 pvr_fw_time_corr_now_ns(void);
++
+ int
+ pvr_fw_hard_reset(struct pvr_device *pvr_dev);
+ 
+--- a/drivers/gpu/drm/imagination/pvr_power.c
++++ b/drivers/gpu/drm/imagination/pvr_power.c
+@@ -131,6 +131,8 @@
+ 	 * waits for idle first and can only time out there, which sends
+ 	 * pvr_power_reset() to "device lost" with nothing reset.
+ 	 */
++	pvr_fw_time_corr_stop(pvr_dev);
++
+ 	if (hard_reset)
+ 		err = pvr_fw_stop_force(pvr_dev);
+ 	else
+@@ -166,6 +168,8 @@
+ 		goto out;
+ 	}
+ 
++	pvr_fw_time_corr_start(pvr_dev);
++
+ 	queue_delayed_work(pvr_dev->sched_wq, &pvr_dev->watchdog.work,
+ 			   msecs_to_jiffies(WATCHDOG_TIME_MS));
+ 

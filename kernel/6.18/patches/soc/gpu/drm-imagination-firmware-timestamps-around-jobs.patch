@@ -1,0 +1,984 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] drm/imagination: firmware timestamps around jobs
+
+Vulkan timestamp queries (and with them GL_ARB_timer_query through zink)
+need a GPU time written at a point in the command stream. This GPU has none
+that a shader can read, and ROGUE_CR_TIMER is only reachable through the
+register bank. The firmware can write one around a job:
+ROGUE_FWIF_CCB_CMD_TYPE_PRE_TIMESTAMP and ROGUE_FWIF_CCB_CMD_TYPE_POST_TIMESTAMP
+"sandwich the DM cmd" (pvr_rogue_fwif.h) and carry the firmware address to
+write to. With the timer correlation of
+`drm-imagination-publish-the-timer-correlation-on-monotonic-raw`
+the value is a u64 in ns of CLOCK_MONOTONIC_RAW (measured, see there).
+
+uAPI, kept compatible in both directions:
+
+  - DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET returns struct
+    drm_pvr_dev_query_timestamp_info (clock, valid bits, largest buffer). It
+    fails with -EOPNOTSUPP unless the GPU and firmware version are ones whose
+    timestamps were measured (BXM-4-64 MC1 36.56.104.183 with firmware 1.1),
+    and an older kernel fails it with -EINVAL. The value 0x100 is set apart
+    from the values mainline allocates in order.
+  - DRM_PVR_BO_FW_TIMESTAMPS (bit 32) creates a buffer the firmware can write
+    to: at most 64 KiB each, 4 MiB together per device, not exportable, not
+    with DRM_PVR_BO_PM_FW_PROTECT.
+  - struct drm_pvr_job gets timestamp_flags (PRE, POST), timestamp_bo_handle
+    and the two offsets. drm_pvr_job is read with copy_struct_from_user(), so
+    an older userspace passes the shorter struct and gets no timestamps, and
+    a newer userspace that asks for none passes zeros an older kernel accepts.
+
+A job with timestamps is written to its CCB as
+
+	FENCE..., PRE_TIMESTAMP, <job>, POST_TIMESTAMP, UPDATE
+
+so the post timestamp is in memory before the job's fence signals and before
+the next job on the queue starts.
+
+The firmware writes through its own address space. The buffer is mapped
+there for as long as it has a handle or a job that writes to it: each handle
+and each such job holds a reference; the last one unmaps it.
+
+Assisted-by: Claude
+---
+--- a/drivers/gpu/drm/imagination/Makefile
++++ b/drivers/gpu/drm/imagination/Makefile
+@@ -26,6 +26,7 @@
+ 	pvr_stream.o \
+ 	pvr_stream_defs.o \
+ 	pvr_sync.o \
++	pvr_timestamp.o \
+ 	pvr_vm.o \
+ 	pvr_vm_mips.o
+ 
+--- a/drivers/gpu/drm/imagination/pvr_device.c
++++ b/drivers/gpu/drm/imagination/pvr_device.c
+@@ -9,6 +9,7 @@
+ #include "pvr_queue.h"
+ #include "pvr_rogue_cr_defs.h"
+ #include "pvr_stream.h"
++#include "pvr_timestamp.h"
+ #include "pvr_vm.h"
+ 
+ #include <drm/drm_print.h>
+@@ -763,6 +764,10 @@
+ 	/* Get the platform-specific data based on the compatible string. */
+ 	pvr_dev->device_data = of_device_get_match_data(dev);
+ 
++	err = pvr_timestamp_device_init(pvr_dev);
++	if (err)
++		return err;
++
+ 	/* Enable and initialize clocks required for the device to operate. */
+ 	err = pvr_device_clk_init(pvr_dev);
+ 	if (err)
+--- a/drivers/gpu/drm/imagination/pvr_device.h
++++ b/drivers/gpu/drm/imagination/pvr_device.h
+@@ -239,6 +239,20 @@
+ 	} queues;
+ 
+ 	/**
++	 * @timestamps: Buffers mapped for the firmware's job timestamps.
++	 */
++	struct {
++		/**
++		 * @timestamps.lock: Protects @timestamps.total and the
++		 *  timestamp mapping of every buffer object.
++		 */
++		struct mutex lock;
++
++		/** @timestamps.total: Size of all those buffers, in bytes. */
++		size_t total;
++	} timestamps;
++
++	/**
+ 	 * @watchdog: Watchdog for communications with firmware.
+ 	 */
+ 	struct {
+--- a/drivers/gpu/drm/imagination/pvr_drv.c
++++ b/drivers/gpu/drm/imagination/pvr_drv.c
+@@ -14,6 +14,7 @@
+ #include "pvr_rogue_defs.h"
+ #include "pvr_rogue_fwif_client.h"
+ #include "pvr_rogue_fwif_shared.h"
++#include "pvr_timestamp.h"
+ #include "pvr_trace.h"
+ #include "pvr_vm.h"
+ 
+@@ -120,8 +121,16 @@
+ 		goto err_drm_dev_exit;
+ 	}
+ 
++	if (args->flags & DRM_PVR_BO_FW_TIMESTAMPS) {
++		err = pvr_timestamp_bo_init(pvr_dev, pvr_obj);
++		if (err)
++			goto err_destroy_obj;
++	}
++
+ 	/* This function will not modify &args->handle unless it succeeds. */
+ 	err = pvr_gem_object_into_handle(pvr_obj, pvr_file, &args->handle);
++	if (args->flags & DRM_PVR_BO_FW_TIMESTAMPS)
++		pvr_timestamp_bo_init_done(pvr_obj);
+ 	if (err)
+ 		goto err_destroy_obj;
+ 
+@@ -659,6 +668,10 @@
+ 	case DRM_PVR_DEV_QUERY_STATIC_DATA_AREAS_GET:
+ 		ret = pvr_static_data_areas_get(pvr_dev, args);
+ 		break;
++
++	case DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET:
++		ret = pvr_timestamp_info_get(pvr_dev, args);
++		break;
+ 	}
+ 
+ 	drm_dev_exit(idx);
+--- a/drivers/gpu/drm/imagination/pvr_drv.h
++++ b/drivers/gpu/drm/imagination/pvr_drv.h
+@@ -68,6 +68,7 @@
+ 	PVR_UOBJ_DECL(struct drm_pvr_dev_query_heap_info, heaps) \
+ 	PVR_UOBJ_DECL(struct drm_pvr_static_data_area, offset) \
+ 	PVR_UOBJ_DECL(struct drm_pvr_dev_query_static_data_areas, static_data_areas) \
++	PVR_UOBJ_DECL(struct drm_pvr_dev_query_timestamp_info, bo_max_size) \
+ 	)
+ 
+ /**
+--- a/drivers/gpu/drm/imagination/pvr_fw.c
++++ b/drivers/gpu/drm/imagination/pvr_fw.c
+@@ -1472,6 +1472,52 @@
+ 	return 0;
+ }
+ 
++/**
++ * pvr_fw_object_map_bo() - Map a userspace buffer object in firmware address space
++ * @pvr_dev: Device pointer.
++ * @pvr_obj: Buffer object to map.
++ *
++ * Unlike the other FW objects, the returned object is not initialised or
++ * cleared on hard reset, and it does not hold a reference to @pvr_obj: the
++ * firmware mapping does, until pvr_fw_object_unmap_bo().
++ *
++ * Returns:
++ *  * The FW object on success, or
++ *  * Any error returned by pvr_fw_object_fw_map().
++ */
++struct pvr_fw_object *
++pvr_fw_object_map_bo(struct pvr_device *pvr_dev, struct pvr_gem_object *pvr_obj)
++{
++	struct pvr_fw_object *fw_obj;
++	int err;
++
++	fw_obj = kzalloc_obj(*fw_obj);
++	if (!fw_obj)
++		return ERR_PTR(-ENOMEM);
++
++	INIT_LIST_HEAD(&fw_obj->node);
++	fw_obj->gem = pvr_obj;
++
++	err = pvr_fw_object_fw_map(pvr_dev, fw_obj, 0);
++	if (err) {
++		kfree(fw_obj);
++		return ERR_PTR(err);
++	}
++
++	return fw_obj;
++}
++
++/**
++ * pvr_fw_object_unmap_bo() - Undo pvr_fw_object_map_bo()
++ * @fw_obj: FW object returned by pvr_fw_object_map_bo().
++ */
++void
++pvr_fw_object_unmap_bo(struct pvr_fw_object *fw_obj)
++{
++	WARN_ON(pvr_fw_object_fw_unmap(fw_obj));
++	kfree(fw_obj);
++}
++
+ static void *
+ pvr_fw_object_create_and_map_common(struct pvr_device *pvr_dev, size_t size,
+ 				    u64 flags, u64 dev_addr,
+--- a/drivers/gpu/drm/imagination/pvr_fw.h
++++ b/drivers/gpu/drm/imagination/pvr_fw.h
+@@ -481,6 +481,10 @@
+ 
+ void pvr_fw_object_destroy(struct pvr_fw_object *fw_obj);
+ 
++struct pvr_fw_object *pvr_fw_object_map_bo(struct pvr_device *pvr_dev,
++					   struct pvr_gem_object *pvr_obj);
++void pvr_fw_object_unmap_bo(struct pvr_fw_object *fw_obj);
++
+ static __always_inline void
+ pvr_fw_object_unmap_and_destroy(struct pvr_fw_object *fw_obj)
+ {
+--- a/drivers/gpu/drm/imagination/pvr_gem.c
++++ b/drivers/gpu/drm/imagination/pvr_gem.c
+@@ -3,6 +3,7 @@
+ 
+ #include "pvr_device.h"
+ #include "pvr_gem.h"
++#include "pvr_timestamp.h"
+ #include "pvr_vm.h"
+ 
+ #include <drm/drm_gem.h>
+@@ -35,7 +36,7 @@
+ {
+ 	struct pvr_gem_object *pvr_obj = gem_to_pvr_gem(obj);
+ 
+-	if (pvr_obj->flags & DRM_PVR_BO_PM_FW_PROTECT)
++	if (pvr_obj->flags & (DRM_PVR_BO_PM_FW_PROTECT | DRM_PVR_BO_FW_TIMESTAMPS))
+ 		return ERR_PTR(-EPERM);
+ 
+ 	return drm_gem_prime_export(obj, flags);
+@@ -54,6 +55,8 @@
+ 
+ static const struct drm_gem_object_funcs pvr_gem_object_funcs = {
+ 	.free = pvr_gem_object_free,
++	.open = pvr_timestamp_bo_open,
++	.close = pvr_timestamp_bo_close,
+ 	.print_info = drm_gem_shmem_object_print_info,
+ 	.export = pvr_gem_export,
+ 	.pin = drm_gem_shmem_object_pin,
+@@ -89,6 +92,11 @@
+ 		 */
+ 		(DRM_PVR_BO_PM_FW_PROTECT |
+ 		 DRM_PVR_BO_ALLOW_CPU_USERSPACE_ACCESS),
++		/*
++		 * Timestamp buffers are written by the firmware on behalf of
++		 * userspace; firmware-private memory has no use for them.
++		 */
++		(DRM_PVR_BO_PM_FW_PROTECT | DRM_PVR_BO_FW_TIMESTAMPS),
+ 	};
+ 
+ 	/*
+--- a/drivers/gpu/drm/imagination/pvr_gem.h
++++ b/drivers/gpu/drm/imagination/pvr_gem.h
+@@ -24,6 +24,9 @@
+ #include <linux/sizes.h>
+ #include <linux/types.h>
+ 
++/* Forward declaration from "pvr_timestamp.c". */
++struct pvr_timestamp_bo;
++
+ /* Forward declaration from "pvr_device.h". */
+ struct pvr_device;
+ struct pvr_file;
+@@ -59,7 +62,9 @@
+ 
+ #define PVR_BO_KERNEL_FLAGS_MASK (PVR_BO_CPU_CACHED | PVR_BO_FW_NO_CLEAR_ON_RESET)
+ 
+-/* Bits 61..3 are undefined. */
++/* Bits 61..33 are undefined. */
++/* Bit 32 is defined in the UAPI. */
++/* Bits 31..3 are undefined. */
+ /* Bits 2..0 are defined in the UAPI. */
+ 
+ /* Other utilities. */
+@@ -102,6 +107,11 @@
+ 	 */
+ 	u64 flags;
+ 
++	/**
++	 * @timestamps: Firmware mapping of a %DRM_PVR_BO_FW_TIMESTAMPS buffer,
++	 * NULL otherwise. Protected by &pvr_device.timestamps.lock.
++	 */
++	struct pvr_timestamp_bo *timestamps;
+ };
+ 
+ static_assert(offsetof(struct pvr_gem_object, base) == 0,
+--- a/drivers/gpu/drm/imagination/pvr_job.c
++++ b/drivers/gpu/drm/imagination/pvr_job.c
+@@ -6,6 +6,7 @@
+ #include "pvr_drv.h"
+ #include "pvr_gem.h"
+ #include "pvr_hwrt.h"
++#include "pvr_timestamp.h"
+ #include "pvr_job.h"
+ #include "pvr_mmu.h"
+ #include "pvr_power.h"
+@@ -34,6 +35,7 @@
+ 
+ 	pvr_queue_job_cleanup(job);
+ 	pvr_job_release_pm_ref(job);
++	pvr_timestamp_job_fini(job);
+ 
+ 	kfree(job->cmd);
+ 	kfree(job);
+@@ -447,6 +449,10 @@
+ 	if (err)
+ 		goto err_put_job;
+ 
++	err = pvr_timestamp_job_init(job, pvr_file, args);
++	if (err)
++		goto err_put_job;
++
+ 	err = pvr_queue_job_init(job, pvr_file->file->client_id);
+ 	if (err)
+ 		goto err_put_job;
+--- a/drivers/gpu/drm/imagination/pvr_job.h
++++ b/drivers/gpu/drm/imagination/pvr_job.h
+@@ -88,6 +88,15 @@
+ 	 * the job is done.
+ 	 */
+ 	bool has_pm_ref;
++
++	/** @timestamps: Buffer the firmware writes the job's timestamps to, or NULL. */
++	struct pvr_timestamp_bo *timestamps;
++
++	/** @timestamp_flags: Combination of ``DRM_PVR_SUBMIT_JOB_TIMESTAMP_*`` flags. */
++	u32 timestamp_flags;
++
++	/** @timestamp_fw_addr: Firmware addresses of the pre and post timestamps. */
++	u32 timestamp_fw_addr[2];
+ };
+ 
+ /**
+--- a/drivers/gpu/drm/imagination/pvr_queue.c
++++ b/drivers/gpu/drm/imagination/pvr_queue.c
+@@ -11,6 +11,7 @@
+ #include "pvr_drv.h"
+ #include "pvr_job.h"
+ #include "pvr_queue.h"
++#include "pvr_timestamp.h"
+ #include "pvr_trace.h"
+ #include "pvr_vm.h"
+ 
+@@ -382,6 +383,7 @@
+ 	 */
+ 	return ufo_cmds_size(ufo_wait_count) +
+ 	       pvr_cccb_get_size_of_cmd_with_hdr(job->cmd_len) +
++	       pvr_timestamp_job_cmds_size(job) +
+ 	       ufo_cmds_size(1);
+ }
+ 
+@@ -726,9 +728,11 @@
+ 		cmd->partial_render_geom_frag_fence.value = job->done_fence->seqno - 1;
+ 	}
+ 
+-	/* Submit job to FW */
++	/* Submit job to FW, between its timestamps if it has any. */
++	pvr_timestamp_job_write_pre(job, cccb);
+ 	pvr_cccb_write_command_with_header(cccb, job->fw_ccb_cmd_type, job->cmd_len, job->cmd,
+ 					   job->id, job->id);
++	pvr_timestamp_job_write_post(job, cccb);
+ 
+ 	/* Update command to signal the job fence. */
+ 	pvr_fw_object_get_fw_addr(queue->timeline_ufo.fw_obj, &ufos[0].addr);
+--- a/drivers/gpu/drm/imagination/pvr_rogue_fwif.h
++++ b/drivers/gpu/drm/imagination/pvr_rogue_fwif.h
+@@ -1552,6 +1552,16 @@
+ 
+ #define ROGUE_FWIF_CCB_CMD_TYPE_PADDING (221U | ROGUE_CMD_MAGIC_DWORD_SHIFTED)
+ 
++/*
++ * Payload of ROGUE_FWIF_CCB_CMD_TYPE_PRE_TIMESTAMP and
++ * ROGUE_FWIF_CCB_CMD_TYPE_POST_TIMESTAMP: the firmware address the firmware
++ * writes the timestamp to.
++ */
++struct rogue_fwif_ccb_cmd_timestamp {
++	u32 addr;
++	u32 reserved;
++};
++
+ struct rogue_fwif_workest_kick_data {
+ 	/* Index for the KM Workload estimation return data array */
+ 	u16 return_data_index __aligned(8);
+--- /dev/null
++++ b/drivers/gpu/drm/imagination/pvr_timestamp.c
+@@ -0,0 +1,408 @@
++// SPDX-License-Identifier: GPL-2.0-only OR MIT
++
++#include "pvr_timestamp.h"
++
++#include "pvr_cccb.h"
++#include "pvr_device.h"
++#include "pvr_drv.h"
++#include "pvr_fw.h"
++#include "pvr_gem.h"
++#include "pvr_job.h"
++#include "pvr_rogue_fwif.h"
++
++#include <drm/drm_gem.h>
++#include <drm/drm_managed.h>
++#include <linux/align.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/kref.h>
++#include <linux/mutex.h>
++#include <linux/slab.h>
++#include <linux/time.h>
++#include <uapi/drm/pvr_drm.h>
++
++/**
++ * struct pvr_timestamp_bo - Firmware mapping of a %DRM_PVR_BO_FW_TIMESTAMPS buffer
++ * @ref: Held by every handle of the buffer and by every job that writes to it.
++ * @pvr_dev: Device the buffer belongs to.
++ * @pvr_obj: The buffer. The firmware mapping keeps it alive.
++ * @fw_obj: The firmware mapping.
++ * @size: Size of the buffer, in bytes.
++ */
++struct pvr_timestamp_bo {
++	struct kref ref;
++	struct pvr_device *pvr_dev;
++	struct pvr_gem_object *pvr_obj;
++	struct pvr_fw_object *fw_obj;
++	size_t size;
++};
++
++/*
++ * The firmware whose PRE_TIMESTAMP and POST_TIMESTAMP handling was measured:
++ * with the timer correlation of pvr_fw_time_corr_start() it writes the time
++ * in ns of the correlation's clock as a u64.
++ */
++static const struct {
++	struct pvr_gpu_id gpu_id;
++	struct pvr_fw_version fw_version;
++} pvr_timestamp_known_fw[] = {
++	{ .gpu_id = { .b = 36, .v = 56, .n = 104, .c = 183 }, .fw_version = { 1, 1 } },
++};
++
++int
++pvr_timestamp_device_init(struct pvr_device *pvr_dev)
++{
++	return drmm_mutex_init(from_pvr_device(pvr_dev), &pvr_dev->timestamps.lock);
++}
++
++/**
++ * pvr_timestamp_supported() - Whether the firmware is known to write job timestamps
++ * @pvr_dev: Target PowerVR device.
++ *
++ * Return: %true for a GPU and firmware version listed in pvr_timestamp_known_fw.
++ */
++bool
++pvr_timestamp_supported(struct pvr_device *pvr_dev)
++{
++	const struct pvr_gpu_id *id = &pvr_dev->gpu_id;
++
++	for (u32 i = 0; i < ARRAY_SIZE(pvr_timestamp_known_fw); i++) {
++		const struct pvr_gpu_id *known = &pvr_timestamp_known_fw[i].gpu_id;
++		const struct pvr_fw_version *ver = &pvr_timestamp_known_fw[i].fw_version;
++
++		if (id->b == known->b && id->v == known->v && id->n == known->n &&
++		    id->c == known->c && pvr_dev->fw_version.major == ver->major &&
++		    pvr_dev->fw_version.minor == ver->minor)
++			return true;
++	}
++
++	return false;
++}
++
++/**
++ * pvr_timestamp_info_get() - Fill &struct drm_pvr_dev_query_timestamp_info
++ * @pvr_dev: Target PowerVR device.
++ * @args: Query arguments.
++ *
++ * Return:
++ *  * 0 on success,
++ *  * -%EOPNOTSUPP if the firmware is not known to write timestamps, or
++ *  * Any error returned by PVR_UOBJ_SET().
++ */
++int
++pvr_timestamp_info_get(struct pvr_device *pvr_dev, struct drm_pvr_ioctl_dev_query_args *args)
++{
++	struct drm_pvr_dev_query_timestamp_info info = {
++		.clock_id = CLOCK_MONOTONIC_RAW,
++		.valid_bits = 64,
++		.bo_max_size = PVR_TIMESTAMP_BO_MAX_SIZE,
++	};
++	int err;
++
++	if (!pvr_timestamp_supported(pvr_dev))
++		return -EOPNOTSUPP;
++
++	if (!args->pointer) {
++		args->size = sizeof(info);
++		return 0;
++	}
++
++	err = PVR_UOBJ_SET(args->pointer, args->size, info);
++	if (err < 0)
++		return err;
++
++	if (args->size > sizeof(info))
++		args->size = sizeof(info);
++
++	return 0;
++}
++
++/**
++ * pvr_timestamp_bo_init() - Map a new %DRM_PVR_BO_FW_TIMESTAMPS buffer for the firmware
++ * @pvr_dev: Target PowerVR device.
++ * @pvr_obj: The new buffer, before it gets a handle.
++ *
++ * The mapping starts with one reference, which pvr_timestamp_bo_init_done()
++ * drops once the buffer has its handle.
++ *
++ * Return:
++ *  * 0 on success,
++ *  * -%EOPNOTSUPP if the firmware is not known to write timestamps,
++ *  * -%EINVAL if the buffer is larger than %PVR_TIMESTAMP_BO_MAX_SIZE,
++ *  * -%ENOSPC if the device's timestamp buffers would exceed
++ *    %PVR_TIMESTAMP_BO_MAX_TOTAL, or
++ *  * Any error returned by pvr_fw_object_map_bo().
++ */
++int
++pvr_timestamp_bo_init(struct pvr_device *pvr_dev, struct pvr_gem_object *pvr_obj)
++{
++	size_t size = pvr_gem_object_size(pvr_obj);
++	struct pvr_timestamp_bo *tbo;
++	int err;
++
++	if (!pvr_timestamp_supported(pvr_dev))
++		return -EOPNOTSUPP;
++
++	if (size > PVR_TIMESTAMP_BO_MAX_SIZE)
++		return -EINVAL;
++
++	tbo = kzalloc_obj(*tbo);
++	if (!tbo)
++		return -ENOMEM;
++
++	mutex_lock(&pvr_dev->timestamps.lock);
++	if (pvr_dev->timestamps.total + size > PVR_TIMESTAMP_BO_MAX_TOTAL) {
++		err = -ENOSPC;
++		goto err_unlock;
++	}
++
++	tbo->fw_obj = pvr_fw_object_map_bo(pvr_dev, pvr_obj);
++	if (IS_ERR(tbo->fw_obj)) {
++		err = PTR_ERR(tbo->fw_obj);
++		goto err_unlock;
++	}
++
++	kref_init(&tbo->ref);
++	tbo->pvr_dev = pvr_dev;
++	tbo->pvr_obj = pvr_obj;
++	tbo->size = size;
++	pvr_dev->timestamps.total += size;
++	pvr_obj->timestamps = tbo;
++	mutex_unlock(&pvr_dev->timestamps.lock);
++
++	return 0;
++
++err_unlock:
++	mutex_unlock(&pvr_dev->timestamps.lock);
++	kfree(tbo);
++
++	return err;
++}
++
++static void
++pvr_timestamp_bo_release(struct kref *ref)
++	__releases(&tbo->pvr_dev->timestamps.lock)
++{
++	struct pvr_timestamp_bo *tbo = container_of(ref, struct pvr_timestamp_bo, ref);
++	struct pvr_device *pvr_dev = tbo->pvr_dev;
++
++	tbo->pvr_obj->timestamps = NULL;
++	pvr_dev->timestamps.total -= tbo->size;
++	mutex_unlock(&pvr_dev->timestamps.lock);
++
++	/* This drops the last reference the driver holds on the buffer. */
++	pvr_fw_object_unmap_bo(tbo->fw_obj);
++	kfree(tbo);
++}
++
++static void
++pvr_timestamp_bo_put(struct pvr_timestamp_bo *tbo)
++{
++	kref_put_mutex(&tbo->ref, pvr_timestamp_bo_release, &tbo->pvr_dev->timestamps.lock);
++}
++
++static struct pvr_timestamp_bo *
++pvr_timestamp_bo_get(struct pvr_gem_object *pvr_obj)
++{
++	struct pvr_device *pvr_dev = to_pvr_device(gem_from_pvr_gem(pvr_obj)->dev);
++	struct pvr_timestamp_bo *tbo;
++
++	mutex_lock(&pvr_dev->timestamps.lock);
++	tbo = pvr_obj->timestamps;
++	if (tbo)
++		kref_get(&tbo->ref);
++	mutex_unlock(&pvr_dev->timestamps.lock);
++
++	return tbo;
++}
++
++/**
++ * pvr_timestamp_bo_init_done() - Drop the reference of pvr_timestamp_bo_init()
++ * @pvr_obj: The buffer, after the attempt to give it a handle.
++ */
++void
++pvr_timestamp_bo_init_done(struct pvr_gem_object *pvr_obj)
++{
++	pvr_timestamp_bo_put(pvr_obj->timestamps);
++}
++
++/**
++ * pvr_timestamp_bo_open() - &drm_gem_object_funcs.open for timestamp buffers
++ * @obj: The buffer.
++ * @file: The file the new handle belongs to.
++ *
++ * Every handle holds the firmware mapping.
++ *
++ * Return: 0, or -%ENOENT if the mapping is already gone.
++ */
++int
++pvr_timestamp_bo_open(struct drm_gem_object *obj, struct drm_file *file)
++{
++	struct pvr_gem_object *pvr_obj = gem_to_pvr_gem(obj);
++
++	if (!(pvr_obj->flags & DRM_PVR_BO_FW_TIMESTAMPS))
++		return 0;
++
++	/* A handle can only be made while another reference holds the mapping. */
++	if (WARN_ON(!pvr_timestamp_bo_get(pvr_obj)))
++		return -ENOENT;
++
++	return 0;
++}
++
++/**
++ * pvr_timestamp_bo_close() - &drm_gem_object_funcs.close for timestamp buffers
++ * @obj: The buffer.
++ * @file: The file the closed handle belonged to.
++ *
++ * The firmware mapping goes when the last handle is closed and no job that
++ * writes to the buffer is left.
++ */
++void
++pvr_timestamp_bo_close(struct drm_gem_object *obj, struct drm_file *file)
++{
++	struct pvr_gem_object *pvr_obj = gem_to_pvr_gem(obj);
++
++	if ((pvr_obj->flags & DRM_PVR_BO_FW_TIMESTAMPS) && !WARN_ON(!pvr_obj->timestamps))
++		pvr_timestamp_bo_put(pvr_obj->timestamps);
++}
++
++static int
++pvr_timestamp_fw_addr(const struct pvr_timestamp_bo *tbo, u64 offset, u32 *fw_addr_out)
++{
++	if (!IS_ALIGNED(offset, sizeof(u64)) || offset > tbo->size - sizeof(u64))
++		return -EINVAL;
++
++	pvr_fw_object_get_fw_addr_offset(tbo->fw_obj, offset, fw_addr_out);
++
++	return 0;
++}
++
++static int
++pvr_timestamp_job_check_unused(const struct drm_pvr_job *args)
++{
++	if (args->timestamp_bo_handle || args->timestamp_pre_offset ||
++	    args->timestamp_post_offset)
++		return -EINVAL;
++
++	return 0;
++}
++
++/**
++ * pvr_timestamp_job_init() - Set up the timestamps a job asks for
++ * @job: The job being created.
++ * @pvr_file: The file submitting the job.
++ * @args: The job's arguments.
++ *
++ * Return:
++ *  * 0 on success,
++ *  * -%EOPNOTSUPP if the firmware is not known to write timestamps, or
++ *  * -%EINVAL if the arguments are invalid.
++ */
++int
++pvr_timestamp_job_init(struct pvr_job *job, struct pvr_file *pvr_file,
++		       const struct drm_pvr_job *args)
++{
++	u32 flags = args->timestamp_flags;
++	struct pvr_gem_object *pvr_obj;
++	int err;
++
++	if (!flags)
++		return pvr_timestamp_job_check_unused(args);
++
++	if (flags & ~DRM_PVR_SUBMIT_JOB_TIMESTAMP_FLAGS_MASK)
++		return -EINVAL;
++
++	if (!pvr_timestamp_supported(job->pvr_dev))
++		return -EOPNOTSUPP;
++
++	pvr_obj = pvr_gem_object_from_handle(pvr_file, args->timestamp_bo_handle);
++	if (!pvr_obj)
++		return -EINVAL;
++
++	job->timestamps = pvr_timestamp_bo_get(pvr_obj);
++	pvr_gem_object_put(pvr_obj);
++	if (!job->timestamps)
++		return -EINVAL;
++
++	job->timestamp_flags = flags;
++	err = 0;
++	if (flags & DRM_PVR_SUBMIT_JOB_TIMESTAMP_PRE)
++		err = pvr_timestamp_fw_addr(job->timestamps, args->timestamp_pre_offset,
++					    &job->timestamp_fw_addr[0]);
++	else if (args->timestamp_pre_offset)
++		err = -EINVAL;
++
++	if (!err && (flags & DRM_PVR_SUBMIT_JOB_TIMESTAMP_POST))
++		err = pvr_timestamp_fw_addr(job->timestamps, args->timestamp_post_offset,
++					    &job->timestamp_fw_addr[1]);
++	else if (!err && args->timestamp_post_offset)
++		err = -EINVAL;
++
++	return err;
++}
++
++/**
++ * pvr_timestamp_job_fini() - Release what pvr_timestamp_job_init() took
++ * @job: The job being released.
++ */
++void
++pvr_timestamp_job_fini(struct pvr_job *job)
++{
++	if (job->timestamps)
++		pvr_timestamp_bo_put(job->timestamps);
++
++	job->timestamps = NULL;
++}
++
++static u32
++pvr_timestamp_cmd_size(void)
++{
++	return pvr_cccb_get_size_of_cmd_with_hdr(sizeof(struct rogue_fwif_ccb_cmd_timestamp));
++}
++
++/**
++ * pvr_timestamp_job_cmds_size() - CCB space the job's timestamp commands take
++ * @job: Target job.
++ *
++ * Return: The size in bytes.
++ */
++u32
++pvr_timestamp_job_cmds_size(const struct pvr_job *job)
++{
++	return hweight32(job->timestamp_flags) * pvr_timestamp_cmd_size();
++}
++
++static void
++pvr_timestamp_write(struct pvr_cccb *cccb, u32 cmd_type, u32 fw_addr)
++{
++	struct rogue_fwif_ccb_cmd_timestamp cmd = { .addr = fw_addr };
++
++	pvr_cccb_write_command_with_header(cccb, cmd_type, sizeof(cmd), &cmd, 0, 0);
++}
++
++/**
++ * pvr_timestamp_job_write_pre() - Write the command for the timestamp before the job
++ * @job: Target job.
++ * @cccb: The job's client CCB, right before the job's command.
++ */
++void
++pvr_timestamp_job_write_pre(const struct pvr_job *job, struct pvr_cccb *cccb)
++{
++	if (job->timestamp_flags & DRM_PVR_SUBMIT_JOB_TIMESTAMP_PRE)
++		pvr_timestamp_write(cccb, ROGUE_FWIF_CCB_CMD_TYPE_PRE_TIMESTAMP,
++				    job->timestamp_fw_addr[0]);
++}
++
++/**
++ * pvr_timestamp_job_write_post() - Write the command for the timestamp after the job
++ * @job: Target job.
++ * @cccb: The job's client CCB, right after the job's command.
++ */
++void
++pvr_timestamp_job_write_post(const struct pvr_job *job, struct pvr_cccb *cccb)
++{
++	if (job->timestamp_flags & DRM_PVR_SUBMIT_JOB_TIMESTAMP_POST)
++		pvr_timestamp_write(cccb, ROGUE_FWIF_CCB_CMD_TYPE_POST_TIMESTAMP,
++				    job->timestamp_fw_addr[1]);
++}
+--- /dev/null
++++ b/drivers/gpu/drm/imagination/pvr_timestamp.h
+@@ -0,0 +1,42 @@
++/* SPDX-License-Identifier: GPL-2.0-only OR MIT */
++
++#ifndef PVR_TIMESTAMP_H
++#define PVR_TIMESTAMP_H
++
++#include <linux/sizes.h>
++#include <linux/types.h>
++
++/* Forward declarations. */
++struct drm_file;
++struct drm_gem_object;
++struct drm_pvr_ioctl_dev_query_args;
++struct drm_pvr_job;
++struct pvr_cccb;
++struct pvr_device;
++struct pvr_file;
++struct pvr_gem_object;
++struct pvr_job;
++
++/* Largest buffer object one %DRM_PVR_BO_FW_TIMESTAMPS buffer may be. */
++#define PVR_TIMESTAMP_BO_MAX_SIZE SZ_64K
++
++/* Firmware address space all timestamp buffers of a device may take together. */
++#define PVR_TIMESTAMP_BO_MAX_TOTAL SZ_4M
++
++int pvr_timestamp_device_init(struct pvr_device *pvr_dev);
++bool pvr_timestamp_supported(struct pvr_device *pvr_dev);
++int pvr_timestamp_info_get(struct pvr_device *pvr_dev, struct drm_pvr_ioctl_dev_query_args *args);
++
++int pvr_timestamp_bo_init(struct pvr_device *pvr_dev, struct pvr_gem_object *pvr_obj);
++int pvr_timestamp_bo_open(struct drm_gem_object *obj, struct drm_file *file);
++void pvr_timestamp_bo_close(struct drm_gem_object *obj, struct drm_file *file);
++void pvr_timestamp_bo_init_done(struct pvr_gem_object *pvr_obj);
++
++int pvr_timestamp_job_init(struct pvr_job *job, struct pvr_file *pvr_file,
++			   const struct drm_pvr_job *args);
++void pvr_timestamp_job_fini(struct pvr_job *job);
++u32 pvr_timestamp_job_cmds_size(const struct pvr_job *job);
++void pvr_timestamp_job_write_pre(const struct pvr_job *job, struct pvr_cccb *cccb);
++void pvr_timestamp_job_write_post(const struct pvr_job *job, struct pvr_cccb *cccb);
++
++#endif /* PVR_TIMESTAMP_H */
+--- a/include/uapi/drm/pvr_drm.h
++++ b/include/uapi/drm/pvr_drm.h
+@@ -435,6 +435,35 @@
+ };
+ 
+ /**
++ * struct drm_pvr_dev_query_timestamp_info - Container used to fetch information
++ * about job timestamps.
++ *
++ * When the query succeeds, the firmware writes job timestamps (see
++ * &drm_pvr_job.timestamp_flags) into buffer objects created with
++ * %DRM_PVR_BO_FW_TIMESTAMPS. Each timestamp is a __u64 in nanoseconds of
++ * @clock_id. The query fails with -%EOPNOTSUPP when the device or its firmware
++ * is not known to write timestamps.
++ *
++ * Structure filled in by %DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET.
++ */
++struct drm_pvr_dev_query_timestamp_info {
++	/**
++	 * @clock_id: The clock the timestamps are taken in, as a clockid_t
++	 * (CLOCK_MONOTONIC_RAW).
++	 */
++	__u32 clock_id;
++
++	/** @valid_bits: Number of valid bits in a timestamp. */
++	__u32 valid_bits;
++
++	/**
++	 * @bo_max_size: Maximum size of one buffer object created with
++	 * %DRM_PVR_BO_FW_TIMESTAMPS, in bytes.
++	 */
++	__u64 bo_max_size;
++};
++
++/**
+  * enum drm_pvr_dev_query - For use with &drm_pvr_ioctl_dev_query_args.type to
+  * indicate the type of the receiving container.
+  *
+@@ -476,6 +505,15 @@
+ 	 * a pointer to &struct drm_pvr_dev_query_static_data_areas.
+ 	 */
+ 	DRM_PVR_DEV_QUERY_STATIC_DATA_AREAS_GET,
++
++	/**
++	 * @DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET: The dev query args contain a
++	 * pointer to &struct drm_pvr_dev_query_timestamp_info.
++	 *
++	 * The value is set apart from the values above, which mainline
++	 * allocates in order.
++	 */
++	DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET = 0x100,
+ };
+ 
+ /**
+@@ -532,14 +570,23 @@
+  * CPU mapping options
+  *    :DRM_PVR_BO_ALLOW_CPU_USERSPACE_ACCESS: Allow userspace to map and access the contents of this
+  *       memory. It is not valid to specify this flag with DRM_PVR_BO_PM_FW_PROTECT.
++ *
++ * Firmware options
++ *    :DRM_PVR_BO_FW_TIMESTAMPS: Also map the buffer for the firmware, so that it can be the target
++ *       of job timestamps (&drm_pvr_job.timestamp_bo_handle). Only valid when
++ *       %DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET succeeds, for a size of at most
++ *       &drm_pvr_dev_query_timestamp_info.bo_max_size, and not with DRM_PVR_BO_PM_FW_PROTECT.
++ *       Such a buffer cannot be exported.
+  */
+ #define DRM_PVR_BO_BYPASS_DEVICE_CACHE _BITULL(0)
+ #define DRM_PVR_BO_PM_FW_PROTECT _BITULL(1)
+ #define DRM_PVR_BO_ALLOW_CPU_USERSPACE_ACCESS _BITULL(2)
+-/* Bits 3..63 are reserved. */
++/* Bits 3..31 are reserved. */
++#define DRM_PVR_BO_FW_TIMESTAMPS _BITULL(32)
++/* Bits 33..63 are reserved. */
+ 
+ #define DRM_PVR_BO_FLAGS_MASK (DRM_PVR_BO_BYPASS_DEVICE_CACHE | DRM_PVR_BO_PM_FW_PROTECT | \
+-			       DRM_PVR_BO_ALLOW_CPU_USERSPACE_ACCESS)
++			       DRM_PVR_BO_ALLOW_CPU_USERSPACE_ACCESS | DRM_PVR_BO_FW_TIMESTAMPS)
+ 
+ /**
+  * struct drm_pvr_ioctl_create_bo_args - Arguments for %DRM_IOCTL_PVR_CREATE_BO
+@@ -1077,6 +1124,28 @@
+ };
+ 
+ /**
++ * DOC: Timestamp flags for SUBMIT_JOB.
++ *
++ * .. c:macro:: DRM_PVR_SUBMIT_JOB_TIMESTAMP_PRE
++ *
++ *    The firmware writes the time at which the job starts to
++ *    &drm_pvr_job.timestamp_pre_offset.
++ *
++ * .. c:macro:: DRM_PVR_SUBMIT_JOB_TIMESTAMP_POST
++ *
++ *    The firmware writes the time at which the job has completed to
++ *    &drm_pvr_job.timestamp_post_offset, before the job's fences signal.
++ *
++ * .. c:macro:: DRM_PVR_SUBMIT_JOB_TIMESTAMP_FLAGS_MASK
++ *
++ *    Logical OR of all the timestamp flags.
++ */
++#define DRM_PVR_SUBMIT_JOB_TIMESTAMP_PRE _BITULL(0)
++#define DRM_PVR_SUBMIT_JOB_TIMESTAMP_POST _BITULL(1)
++#define DRM_PVR_SUBMIT_JOB_TIMESTAMP_FLAGS_MASK \
++	(DRM_PVR_SUBMIT_JOB_TIMESTAMP_PRE | DRM_PVR_SUBMIT_JOB_TIMESTAMP_POST)
++
++/**
+  * DOC: Flags for SUBMIT_JOB ioctl geometry command.
+  *
+  * .. c:macro:: DRM_PVR_SUBMIT_JOB_GEOM_CMD_FIRST
+@@ -1274,6 +1343,34 @@
+ 	 * Must be zero for non-render jobs.
+ 	 */
+ 	struct drm_pvr_hwrt_data_ref hwrt;
++
++	/**
++	 * @timestamp_flags: [IN] Combination of ``DRM_PVR_SUBMIT_JOB_TIMESTAMP_*``
++	 * flags. Zero for no timestamps, in which case the other timestamp
++	 * fields must be zero too.
++	 *
++	 * Only valid when %DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET succeeds, and
++	 * not for %DRM_PVR_JOB_TYPE_NULL.
++	 */
++	__u32 timestamp_flags;
++
++	/**
++	 * @timestamp_bo_handle: [IN] Buffer object created with
++	 * %DRM_PVR_BO_FW_TIMESTAMPS the timestamps are written to.
++	 */
++	__u32 timestamp_bo_handle;
++
++	/**
++	 * @timestamp_pre_offset: [IN] Offset in @timestamp_bo_handle of the
++	 * __u64 taken before the job starts. Must be 8-byte aligned.
++	 */
++	__u64 timestamp_pre_offset;
++
++	/**
++	 * @timestamp_post_offset: [IN] Offset in @timestamp_bo_handle of the
++	 * __u64 taken after the job completes. Must be 8-byte aligned.
++	 */
++	__u64 timestamp_post_offset;
+ };
+ 
+ /**

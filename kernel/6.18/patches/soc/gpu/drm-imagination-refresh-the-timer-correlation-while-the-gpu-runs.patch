@@ -1,0 +1,120 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] drm/imagination: refresh the timer correlation while the GPU
+ runs
+
+An entry of the timer correlation is published when the firmware boots
+(`drm-imagination-publish-the-timer-correlation-on-monotonic-raw`). While
+the GPU stays powered nothing renews it, and the firmware extrapolates from
+that one point with the nominal factor. Any difference between the nominal
+core clock and the real one grows linearly with the time the GPU stays on;
+on the A733 the difference is small, but it adds up over hours.
+
+pvr_fw_time_corr_refresh() runs from the watchdog worker, which already holds
+a power reference every 500 ms, and publishes a new entry once the newest one
+is 2 s old:
+
+  - if the firmware's time has fallen behind the host's, the new entry starts
+    at the host's time (a step forward);
+  - if it is ahead, the new entry starts where the firmware's time is, so its
+    timestamps never go backwards, and its factor is chosen to meet the host's
+    time one period later, at most 0.1 % off the nominal factor.
+
+Assisted-by: Claude
+---
+--- a/drivers/gpu/drm/imagination/pvr_fw.c
++++ b/drivers/gpu/drm/imagination/pvr_fw.c
+@@ -1041,6 +1041,73 @@
+ 	mutex_unlock(&fw_dev->time_corr.lock);
+ }
+ 
++/*
++ * A new entry is published once the previous one is this old. The firmware's
++ * conversion stays valid for hours (see pvr_rogue_fwif.h); the period bounds
++ * how far its time can drift from the host's before it is pulled back.
++ */
++#define PVR_FW_TIME_CORR_PERIOD_NS (2ULL * NSEC_PER_SEC)
++
++/* The factor never deviates from the nominal one by more than 1/this. */
++#define PVR_FW_TIME_CORR_MAX_ADJUST 1000
++
++static u64
++pvr_fw_time_corr_steer(u64 nominal, u64 os, u64 target_os, u64 cr_delta)
++{
++	u64 lo = nominal - nominal / PVR_FW_TIME_CORR_MAX_ADJUST;
++	u64 hi = nominal + nominal / PVR_FW_TIME_CORR_MAX_ADJUST;
++
++	if (target_os <= os || !cr_delta)
++		return lo;
++
++	return clamp(div64_u64((target_os - os) << ROGUE_FWIF_CRDELTA_TO_OSDELTA_ACCURACY_SHIFT,
++			       cr_delta), lo, hi);
++}
++
++/**
++ * pvr_fw_time_corr_refresh() - Pull the firmware's time back to the host's
++ * @pvr_dev: Target PowerVR device.
++ *
++ * Called periodically while the firmware runs. Publishes a new entry when the
++ * newest one is older than %PVR_FW_TIME_CORR_PERIOD_NS. If the firmware's
++ * time has fallen behind, the new entry starts at the host time. If it is
++ * ahead, the new entry starts where the firmware's time is, so it does not
++ * go backwards, and its factor is chosen to meet the host time one period
++ * later, within %PVR_FW_TIME_CORR_MAX_ADJUST of the nominal factor.
++ *
++ * The GPU must be powered.
++ */
++void
++pvr_fw_time_corr_refresh(struct pvr_device *pvr_dev)
++{
++	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
++	u64 core_clock_hz = clk_get_rate(pvr_dev->core_clk);
++	u64 cr, os, estimate, cr_delta, factor;
++
++	if (WARN_ON(!core_clock_hz))
++		return;
++
++	mutex_lock(&fw_dev->time_corr.lock);
++	if (!fw_dev->time_corr.valid)
++		goto out_unlock;
++
++	pvr_fw_time_corr_sample(pvr_dev, &cr, &os);
++	if (os < fw_dev->time_corr.os + PVR_FW_TIME_CORR_PERIOD_NS)
++		goto out_unlock;
++
++	estimate = pvr_fw_time_corr_estimate(fw_dev, cr);
++	cr_delta = cr - fw_dev->time_corr.cr;
++	factor = pvr_fw_time_corr_factor(core_clock_hz);
++	if (estimate > os)
++		factor = pvr_fw_time_corr_steer(factor, estimate,
++						os + PVR_FW_TIME_CORR_PERIOD_NS, cr_delta);
++
++	pvr_fw_time_corr_publish(pvr_dev, cr, max(os, estimate), factor);
++
++out_unlock:
++	mutex_unlock(&fw_dev->time_corr.lock);
++}
++
+ /**
+  * pvr_fw_time_corr_stop() - Retire the timer correlation before the firmware stops
+  * @pvr_dev: Target PowerVR device.
+--- a/drivers/gpu/drm/imagination/pvr_fw.h
++++ b/drivers/gpu/drm/imagination/pvr_fw.h
+@@ -432,6 +432,7 @@
+ 
+ void pvr_fw_time_corr_start(struct pvr_device *pvr_dev);
+ void pvr_fw_time_corr_stop(struct pvr_device *pvr_dev);
++void pvr_fw_time_corr_refresh(struct pvr_device *pvr_dev);
+ u64 pvr_fw_time_corr_now_ns(void);
+ 
+ int
+--- a/drivers/gpu/drm/imagination/pvr_power.c
++++ b/drivers/gpu/drm/imagination/pvr_power.c
+@@ -260,6 +260,8 @@
+ 	if (!READ_ONCE(pvr_dev->fw_dev.initialised))
+ 		goto out_pm_runtime_put;
+ 
++	pvr_fw_time_corr_refresh(pvr_dev);
++
+ 	stalled = pvr_watchdog_kccb_stalled(pvr_dev);
+ 
+ 	if (stalled) {

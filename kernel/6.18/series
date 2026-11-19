@@ -209,6 +209,9 @@ soc/gpu/drm-imagination-run-the-device-lost-unplug-from-a-worker.patch
 soc/gpu/drm-imagination-force-the-firmware-stop-on-hard-reset.patch
 soc/gpu/drm-imagination-ask-for-idle-again-when-nobody-holds-the-gpu.patch
 soc/gpu/drm-imagination-check-the-job-s-done-fence-on-a-timeout.patch
+soc/gpu/drm-imagination-publish-the-timer-correlation-on-monotonic-raw.patch
+soc/gpu/drm-imagination-refresh-the-timer-correlation-while-the-gpu-runs.patch
+soc/gpu/drm-imagination-firmware-timestamps-around-jobs.patch
 soc/dts/arm64-dts-a733-feed-the-watchdog-hosc-from-the-dcxo.patch
 board/dts/arm64-dts-a733-cubie-a7s-reserve-a-ramoops-window.patch
 soc/dts/arm64-dts-a733-cubie-a7s-watchdog-on-wdt-cpus.patch

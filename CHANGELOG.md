@@ -27,6 +27,18 @@ driver, the second run installs `a7s-aic8800-dkms`.
 
 ### Added
 
+- GPU job timestamps: the driver publishes the timer correlation the
+  firmware converts its timer with, on CLOCK_MONOTONIC_RAW, after every
+  firmware boot and every 2 s while the GPU runs
+  (`drm-imagination-publish-the-timer-correlation-on-monotonic-raw`,
+  `drm-imagination-refresh-the-timer-correlation-while-the-gpu-runs`), and a
+  uAPI of our own lets userspace have the firmware write a timestamp before and
+  after a job (`drm-imagination-firmware-timestamps-around-jobs`: query
+  `DRM_PVR_DEV_QUERY_TIMESTAMP_INFO_GET`, buffer flag `DRM_PVR_BO_FW_TIMESTAMPS`,
+  fields at the end of `struct drm_pvr_job`). Reported only for the BXM-4-64
+  MC1 with firmware 1.1, where it was measured. Mainline does not have this
+  uAPI; a userspace that does not use it sees no change.
+
 - `a7s-aic8800-dkms`, the WLAN/BT driver source for DKMS, is a release
   file. `a7s-kernel-update` installs it before the kernel packages, so a
   board gets a new driver without a new image. It links
