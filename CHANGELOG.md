@@ -54,6 +54,12 @@ may be short).
   Seven of our patches and the compat patch are dropped, one is added. The
   counter `rx_unknown_msgs` is gone.
 
+## [6.18.63-T2] - 2026-11-19
+
+Test build of the changes under Unreleased: the A733 USB host burst fix,
+the aic8800 driver from Radxa's `-11` as shipped, and the driver as the
+release file `a7s-aic8800-dkms`, which `a7s-kernel-update` installs.
+
 ## [6.18.63-R2] - 2026-11-15
 
 6.18.63-R1 with the `netconsole` module added; the patches, the configuration
