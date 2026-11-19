@@ -1,0 +1,714 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] drm/imagination: scale the core clock with the firmware's
+ utilisation
+
+Add devfreq to drm/imagination: an OPP table on the "core" clock, an optional
+"power" supply set with it, the simple_ondemand governor fed from the
+firmware's utilisation data, and a devfreq cooling device. A device tree
+without operating-points-v2 is unaffected: the driver does nothing then.
+
+Load. Busy time is the firmware's ACTIVE time, total time the firmware's sum
+of IDLE, ACTIVE and BLOCKED time over the same interval, as the vendor driver
+divides it. Both are in the clock of the timer correlation
+(CLOCK_MONOTONIC_RAW, `drm-imagination-publish-the-timer-correlation-on-monotonic-raw`),
+whose conversion changes with every rate, and that conversion cancels out of
+the quotient. stats_counters[] only grow when the firmware leaves a state, so
+the time in the current state is added from last_word's stamp. last_word is
+read before and after the counters; if it moved, the read is repeated. If the
+firmware's time did not advance the interval counts as idle with the wall
+time as total. A sample that cannot be trusted -- no consistent read, counters
+that went backwards because the firmware was reset, a GPU that is
+runtime-suspended -- counts as idle and starts a new baseline, and busy is
+capped at total. A bad sample can therefore lower the clock for one period,
+never raise it.
+
+Rate change. dev_pm_opp_set_rate() orders supply and clock. Afterwards the
+firmware is told: the rate goes into SYSINIT and the runtime config, which the
+firmware reads at boot. A running firmware gets a new timer correlation entry
+from pvr_fw_time_corr_rate_changed(), because ROGUE_CR_TIMER counts core
+clock cycles and the firmware converts its timestamps with the factor of the
+newest entry: the entry starts at the current CR and OS time (not before the
+firmware's own time, so timestamps do not go backwards) with the factor of
+the new rate. Then ROGUE_FWIF_KCCB_CMD_CORECLKSPEEDCHANGE follows. All of that
+only happens if the GPU is already active (pm_runtime_get_if_active()) and no
+reset holds reset_sem (down_read_trylock()), so the governor never powers the
+GPU and never waits for a reset; a reset publishes its own correlation when it
+restarts the firmware. The entry is taken after the clock switch returned, so
+a timestamp written in that short window is converted with the old factor.
+The watchdog's periodic refresh keeps one entry from covering
+more than a few seconds.
+
+clk_lock serialises the writers of the rate and the correlation: the
+governor and pvr_power_fw_enable(), which now stores the current rate before it
+starts the firmware.
+
+Lifetime. devfreq_add_device(), not the devm variant, so the governor is
+removed in pvr_device_fini() before the firmware structures it reads are
+freed. A failure to set up devfreq is reported and not fatal: the GPU keeps
+the rate its clock has, and the device tree has to make that a safe one.
+
+Polling every 200 ms, the governor's own thresholds. The driver maps the runtime config the way it maps the other structures the host writes.
+
+Assisted-by: Claude
+---
+--- a/drivers/gpu/drm/imagination/Kconfig
++++ b/drivers/gpu/drm/imagination/Kconfig
+@@ -13,6 +13,8 @@
+ 	select DRM_SCHED
+ 	select DRM_GPUVM
+ 	select FW_LOADER
++	select PM_DEVFREQ
++	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+ 	help
+ 	  Choose this option if you have a system that has an Imagination
+ 	  Technologies PowerVR (Series 6 or later) or IMG GPU.
+--- a/drivers/gpu/drm/imagination/Makefile
++++ b/drivers/gpu/drm/imagination/Makefile
+@@ -5,6 +5,7 @@
+ 	pvr_ccb.o \
+ 	pvr_cccb.o \
+ 	pvr_context.o \
++	pvr_devfreq.o \
+ 	pvr_device.o \
+ 	pvr_device_info.o \
+ 	pvr_drv.o \
+--- /dev/null
++++ b/drivers/gpu/drm/imagination/pvr_devfreq.c
+@@ -0,0 +1,351 @@
++// SPDX-License-Identifier: GPL-2.0-only OR MIT
++
++#include "pvr_devfreq.h"
++#include "pvr_device.h"
++#include "pvr_fw.h"
++#include "pvr_power.h"
++#include "pvr_rogue_fwif.h"
++#include "pvr_rogue_fwif_common.h"
++
++#include <drm/drm_print.h>
++
++#include <linux/clk.h>
++#include <linux/devfreq.h>
++#include <linux/devfreq_cooling.h>
++#include <linux/minmax.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/pm_opp.h>
++#include <linux/pm_runtime.h>
++#include <linux/rwsem.h>
++
++/*
++ * Sampling period of the governor: its own thresholds are tuned for it.
++ */
++#define PVR_DEVFREQ_POLL_MS 200
++
++/* Attempts at a consistent read of the firmware utilisation data. */
++#define PVR_DEVFREQ_UTIL_READ_TRIES 3
++
++static struct pvr_device *
++pvr_devfreq_to_pvr_device(struct device *dev)
++{
++	return to_pvr_device(dev_get_drvdata(dev));
++}
++
++/**
++ * pvr_devfreq_read_util() - Read the firmware's accumulated utilisation times
++ * @pvr_dev: Target PowerVR device.
++ * @now: pvr_fw_time_corr_now_ns() of the sample.
++ * @active_out: Location to store the active time, in ns.
++ * @total_out: Location to store the sum of the idle, active and blocked times, in ns.
++ *
++ * The firmware adds the length of a state to stats_counters[] when it leaves
++ * the state, and stamps the state it enters in last_word, in the clock of the
++ * timer correlation. The time spent in the current state so far is therefore
++ * @now minus that stamp, and it is added to that state's counter. A stamp of
++ * zero means the firmware had no timer correlation when it entered the state;
++ * nothing is added for it.
++ *
++ * Both times come from the firmware, so the load is the ratio the firmware
++ * measured; the conversion of its timer to ns, which changes with every
++ * clock rate, cancels out of the quotient.
++ *
++ * last_word is read before and after the counters. If it moved, the firmware
++ * committed a transition in between and the read is repeated.
++ *
++ * Return: %true if a consistent value was read.
++ */
++static bool
++pvr_devfreq_read_util(struct pvr_device *pvr_dev, u64 now, u64 *active_out, u64 *total_out)
++{
++	struct rogue_fwif_gpu_util_fwcb *util = pvr_dev->fw_dev.gpu_util_fwcb;
++
++	for (int i = 0; i < PVR_DEVFREQ_UTIL_READ_TRIES; i++) {
++		u64 word = READ_ONCE(util->last_word);
++		u64 since = word & ~PVR_FWIF_GPU_UTIL_STATE_MASK;
++		u32 state = word & PVR_FWIF_GPU_UTIL_STATE_MASK;
++		u64 counter[PVR_FWIF_GPU_UTIL_STATE_NUM];
++		u64 total = 0;
++
++		rmb();
++		for (int s = 0; s < PVR_FWIF_GPU_UTIL_STATE_NUM; s++)
++			counter[s] = READ_ONCE(util->stats_counters[s]);
++		rmb();
++
++		if (READ_ONCE(util->last_word) != word)
++			continue;
++
++		if (state < PVR_FWIF_GPU_UTIL_STATE_NUM && since && now > since)
++			counter[state] += now - since;
++
++		for (int s = 0; s < PVR_FWIF_GPU_UTIL_STATE_NUM; s++)
++			total += counter[s];
++
++		*active_out = counter[PVR_FWIF_GPU_UTIL_STATE_ACTIVE];
++		*total_out = total;
++		return true;
++	}
++
++	return false;
++}
++
++/*
++ * Busy time is the firmware's ACTIVE time, total time the firmware's sum of
++ * IDLE, ACTIVE and BLOCKED time over the same interval. If the firmware's time
++ * did not advance (no timer correlation, or nothing powered) the interval is
++ * reported idle with the wall time as total. A sample that cannot be trusted
++ * (no consistent read, counters that went backwards because the firmware was
++ * reset, a powered-off GPU) reports the interval as idle and starts a new
++ * baseline: the GPU then drops to a lower OPP for one period at most, which
++ * costs speed, not correctness.
++ */
++static int
++pvr_devfreq_get_dev_status(struct device *dev, struct devfreq_dev_status *status)
++{
++	struct pvr_device *pvr_dev = pvr_devfreq_to_pvr_device(dev);
++	struct pvr_devfreq *pdf = &pvr_dev->devfreq;
++	u64 now = pvr_fw_time_corr_now_ns();
++	u64 wall = max(now - pdf->last_sample_ns, 1ULL);
++	u64 busy = 0, total = 0;
++	u64 active, fw_total;
++
++	status->current_frequency = READ_ONCE(pdf->cur_freq);
++
++	if (!pvr_devfreq_read_util(pvr_dev, now, &active, &fw_total)) {
++		dev_dbg(dev, "inconsistent firmware utilisation sample\n");
++		pdf->rebase = true;
++		goto out;
++	}
++
++	if (!pdf->rebase && active >= pdf->last_active_ns && fw_total >= pdf->last_total_ns &&
++	    !pm_runtime_suspended(dev)) {
++		busy = active - pdf->last_active_ns;
++		total = fw_total - pdf->last_total_ns;
++	}
++
++	pdf->last_active_ns = active;
++	pdf->last_total_ns = fw_total;
++	pdf->rebase = false;
++
++out:
++	status->total_time = total ?: wall;
++	status->busy_time = min(busy, (u64)status->total_time);
++	pdf->last_sample_ns = now;
++
++	return 0;
++}
++
++static int
++pvr_devfreq_get_cur_freq(struct device *dev, unsigned long *freq)
++{
++	struct pvr_device *pvr_dev = pvr_devfreq_to_pvr_device(dev);
++
++	*freq = READ_ONCE(pvr_dev->devfreq.cur_freq);
++
++	return 0;
++}
++
++/**
++ * pvr_devfreq_update_fw() - Bring the firmware's view of the core clock up to date
++ * @pvr_dev: Target PowerVR device.
++ * @changed: %true if the core clock rate has just changed.
++ *
++ * The rate is stored where the firmware reads it at boot and at run time, so
++ * a firmware that boots later starts with it. A running firmware gets, after a
++ * change, a new timer correlation (the firmware's timestamps follow the core
++ * clock, see pvr_fw_time_corr_rate_changed()) and
++ * ROGUE_FWIF_KCCB_CMD_CORECLKSPEEDCHANGE.
++ *
++ * Nothing here powers the GPU or waits for a reset: the GPU is only touched if
++ * it is already active, and a reset in progress publishes its own correlation
++ * when it restarts the firmware.
++ *
++ * Called with &pvr_device.clk_lock held.
++ */
++static void
++pvr_devfreq_update_fw(struct pvr_device *pvr_dev, bool changed)
++{
++	struct device *dev = from_pvr_device(pvr_dev)->dev;
++	u32 rate = clk_get_rate(pvr_dev->core_clk);
++	struct rogue_fwif_kccb_cmd cmd = {
++		.cmd_type = ROGUE_FWIF_KCCB_CMD_CORECLKSPEEDCHANGE,
++		.cmd_data.core_clk_speed_change_data.new_clock_speed = rate,
++	};
++	int err;
++
++	pvr_fw_set_core_clock_speed(pvr_dev, rate);
++
++	if (pm_runtime_get_if_active(dev) <= 0)
++		return;
++
++	if (!down_read_trylock(&pvr_dev->reset_sem))
++		goto out_put;
++
++	if (!READ_ONCE(pvr_dev->fw_dev.initialised) || pvr_dev->lost)
++		goto out_up_read;
++
++	if (changed) {
++		pvr_fw_time_corr_rate_changed(pvr_dev);
++
++		err = pvr_kccb_send_cmd_powered(pvr_dev, &cmd, NULL);
++		if (err)
++			dev_warn_ratelimited(dev, "core clock change not sent to FW (%d)\n",
++					     err);
++	}
++
++out_up_read:
++	up_read(&pvr_dev->reset_sem);
++
++out_put:
++	pvr_power_put(pvr_dev);
++}
++
++static int
++pvr_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
++{
++	struct pvr_device *pvr_dev = pvr_devfreq_to_pvr_device(dev);
++	struct pvr_devfreq *pdf = &pvr_dev->devfreq;
++	struct dev_pm_opp *opp;
++	bool changed = false;
++	int err = 0;
++
++	opp = devfreq_recommended_opp(dev, freq, flags);
++	if (IS_ERR(opp))
++		return PTR_ERR(opp);
++	dev_pm_opp_put(opp);
++
++	mutex_lock(&pvr_dev->clk_lock);
++
++	if (*freq != pdf->cur_freq) {
++		err = dev_pm_opp_set_rate(dev, *freq);
++		if (err)
++			goto out_unlock;
++
++		WRITE_ONCE(pdf->cur_freq, *freq);
++		changed = true;
++	}
++
++	if (changed)
++		pvr_devfreq_update_fw(pvr_dev, true);
++
++out_unlock:
++	mutex_unlock(&pvr_dev->clk_lock);
++
++	return err;
++}
++
++static int
++pvr_devfreq_opp_init(struct pvr_device *pvr_dev)
++{
++	struct device *dev = from_pvr_device(pvr_dev)->dev;
++	static const char * const clk_names[] = { "core", NULL };
++	static const char * const reg_names[] = { "power", NULL };
++	struct dev_pm_opp_config config = {
++		.clk_names = clk_names,
++	};
++	int err;
++
++	if (of_property_present(dev->of_node, "power-supply"))
++		config.regulator_names = reg_names;
++
++	err = devm_pm_opp_set_config(dev, &config);
++	if (err)
++		return err;
++
++	return devm_pm_opp_of_add_table(dev);
++}
++
++/**
++ * pvr_devfreq_init() - Scale the core clock with the GPU's load
++ * @pvr_dev: Target PowerVR device.
++ *
++ * Does nothing for a device without an OPP table. Must be called once the
++ * firmware runs, since the load is the firmware's utilisation data.
++ *
++ * The core clock is moved to the OPP that covers its current rate, which also
++ * sets the supply for it, before the governor starts.
++ *
++ * Return:
++ *  * 0 on success or if the device has no OPP table, or
++ *  * any error from the OPP or devfreq core.
++ */
++int
++pvr_devfreq_init(struct pvr_device *pvr_dev)
++{
++	struct device *dev = from_pvr_device(pvr_dev)->dev;
++	struct pvr_devfreq *pdf = &pvr_dev->devfreq;
++	unsigned long freq = clk_get_rate(pvr_dev->core_clk);
++	struct devfreq *devfreq;
++	struct dev_pm_opp *opp;
++	u64 active = 0, total = 0;
++	int err;
++
++	if (!of_property_present(dev->of_node, "operating-points-v2"))
++		return 0;
++
++	err = pvr_devfreq_opp_init(pvr_dev);
++	if (err)
++		return err;
++
++	opp = devfreq_recommended_opp(dev, &freq, 0);
++	if (IS_ERR(opp))
++		return PTR_ERR(opp);
++	dev_pm_opp_put(opp);
++
++	mutex_lock(&pvr_dev->clk_lock);
++	err = dev_pm_opp_set_rate(dev, freq);
++	if (!err) {
++		pdf->cur_freq = freq;
++		pvr_devfreq_update_fw(pvr_dev, true);
++	}
++	mutex_unlock(&pvr_dev->clk_lock);
++	if (err)
++		return err;
++
++	pdf->last_sample_ns = pvr_fw_time_corr_now_ns();
++	pdf->rebase = !pvr_devfreq_read_util(pvr_dev, pdf->last_sample_ns, &active, &total);
++	pdf->last_active_ns = active;
++	pdf->last_total_ns = total;
++
++	pdf->profile.polling_ms = PVR_DEVFREQ_POLL_MS;
++	pdf->profile.initial_freq = freq;
++	pdf->profile.target = pvr_devfreq_target;
++	pdf->profile.get_dev_status = pvr_devfreq_get_dev_status;
++	pdf->profile.get_cur_freq = pvr_devfreq_get_cur_freq;
++
++	devfreq = devfreq_add_device(dev, &pdf->profile, DEVFREQ_GOV_SIMPLE_ONDEMAND, NULL);
++	if (IS_ERR(devfreq))
++		return PTR_ERR(devfreq);
++
++	pdf->devfreq = devfreq;
++
++	pdf->cooling = of_devfreq_cooling_register(dev->of_node, devfreq);
++	if (IS_ERR(pdf->cooling)) {
++		drm_info(from_pvr_device(pvr_dev), "no devfreq cooling device (%ld)\n",
++			 PTR_ERR(pdf->cooling));
++		pdf->cooling = NULL;
++	}
++
++	return 0;
++}
++
++/**
++ * pvr_devfreq_fini() - Stop scaling the core clock
++ * @pvr_dev: Target PowerVR device.
++ *
++ * Must run before the firmware structures the governor reads are freed.
++ */
++void
++pvr_devfreq_fini(struct pvr_device *pvr_dev)
++{
++	struct pvr_devfreq *pdf = &pvr_dev->devfreq;
++
++	if (pdf->cooling)
++		devfreq_cooling_unregister(pdf->cooling);
++	pdf->cooling = NULL;
++
++	if (pdf->devfreq)
++		devfreq_remove_device(pdf->devfreq);
++	pdf->devfreq = NULL;
++}
+--- /dev/null
++++ b/drivers/gpu/drm/imagination/pvr_devfreq.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: GPL-2.0-only OR MIT */
++
++#ifndef PVR_DEVFREQ_H
++#define PVR_DEVFREQ_H
++
++#include <linux/devfreq.h>
++#include <linux/types.h>
++
++struct pvr_device;
++struct thermal_cooling_device;
++
++/**
++ * struct pvr_devfreq - Core clock scaling state of a PowerVR device
++ */
++struct pvr_devfreq {
++	/** @devfreq: devfreq device, %NULL if the device has no OPP table. */
++	struct devfreq *devfreq;
++
++	/** @cooling: devfreq cooling device, %NULL if none was registered. */
++	struct thermal_cooling_device *cooling;
++
++	/** @profile: devfreq profile of this device. */
++	struct devfreq_dev_profile profile;
++
++	/** @cur_freq: Core clock rate of the current OPP, in Hz. */
++	unsigned long cur_freq;
++
++	/** @last_active_ns: Active time at the previous sample. */
++	u64 last_active_ns;
++
++	/** @last_total_ns: Idle, active and blocked time summed, at the previous sample. */
++	u64 last_total_ns;
++
++	/** @last_sample_ns: pvr_fw_time_corr_now_ns() at the previous sample. */
++	u64 last_sample_ns;
++
++	/** @rebase: The previous sample is no baseline; the next one only becomes one. */
++	bool rebase;
++};
++
++int pvr_devfreq_init(struct pvr_device *pvr_dev);
++void pvr_devfreq_fini(struct pvr_device *pvr_dev);
++
++#endif /* PVR_DEVFREQ_H */
+--- a/drivers/gpu/drm/imagination/pvr_device.c
++++ b/drivers/gpu/drm/imagination/pvr_device.c
+@@ -12,6 +12,7 @@
+ #include "pvr_timestamp.h"
+ #include "pvr_vm.h"
+ 
++#include <drm/drm_managed.h>
+ #include <drm/drm_print.h>
+ 
+ #include <linux/bitfield.h>
+@@ -768,6 +769,10 @@
+ 	if (err)
+ 		return err;
+ 
++	err = drmm_mutex_init(drm_dev, &pvr_dev->clk_lock);
++	if (err)
++		return err;
++
+ 	/* Enable and initialize clocks required for the device to operate. */
+ 	err = pvr_device_clk_init(pvr_dev);
+ 	if (err)
+@@ -796,6 +801,16 @@
+ 	if (err)
+ 		goto err_device_gpu_fini;
+ 
++	/*
++	 * Not fatal: without it the GPU keeps running at the rate its clock was
++	 * left at, which the device tree has to make a safe one.
++	 */
++	err = pvr_devfreq_init(pvr_dev);
++	if (err) {
++		drm_warn(drm_dev, "core clock scaling disabled (%d)\n", err);
++		pvr_devfreq_fini(pvr_dev);
++	}
++
+ 	pm_runtime_put(dev);
+ 
+ 	return 0;
+@@ -820,6 +835,7 @@
+ 	 * Deinitialization stages are performed in reverse order compared to
+ 	 * the initialization stages in pvr_device_init().
+ 	 */
++	pvr_devfreq_fini(pvr_dev);
+ 	pvr_device_irq_fini(pvr_dev);
+ 	pvr_device_gpu_fini(pvr_dev);
+ }
+--- a/drivers/gpu/drm/imagination/pvr_device.h
++++ b/drivers/gpu/drm/imagination/pvr_device.h
+@@ -5,6 +5,7 @@
+ #define PVR_DEVICE_H
+ 
+ #include "pvr_ccb.h"
++#include "pvr_devfreq.h"
+ #include "pvr_device_info.h"
+ #include "pvr_fw.h"
+ #include "pvr_rogue_fwif_stream.h"
+@@ -133,6 +134,16 @@
+ 	struct clk *core_clk;
+ 
+ 	/**
++	 * @clk_lock: Serialises changes of the core clock rate with what the
++	 *            firmware is told about it: the rate fields it reads at boot
++	 *            and the timer correlation it timestamps with.
++	 */
++	struct mutex clk_lock;
++
++	/** @devfreq: Core clock scaling state. */
++	struct pvr_devfreq devfreq;
++
++	/**
+ 	 * @sys_clk: Optional system bus clock.
+ 	 *
+ 	 * This may be used on some platforms to provide an independent clock to the SoC Interface
+--- a/drivers/gpu/drm/imagination/pvr_fw.c
++++ b/drivers/gpu/drm/imagination/pvr_fw.c
+@@ -520,11 +520,14 @@
+ 		goto err_release_fault_page;
+ 	}
+ 
+-	err = pvr_fw_object_create(pvr_dev, sizeof(struct rogue_fwif_runtime_cfg),
+-				   PVR_BO_FW_FLAGS_DEVICE_UNCACHED,
+-				   fw_runtime_cfg_init, pvr_dev, &fw_mem->runtime_cfg_obj);
+-	if (err) {
++	fw_dev->fwif_runtime_cfg = pvr_fw_object_create_and_map(pvr_dev,
++								sizeof(*fw_dev->fwif_runtime_cfg),
++								PVR_BO_FW_FLAGS_DEVICE_UNCACHED,
++								fw_runtime_cfg_init, pvr_dev,
++								&fw_mem->runtime_cfg_obj);
++	if (IS_ERR(fw_dev->fwif_runtime_cfg)) {
+ 		drm_err(drm_dev, "Unable to allocate FW runtime config\n");
++		err = PTR_ERR(fw_dev->fwif_runtime_cfg);
+ 		goto err_release_gpu_util_fwcb;
+ 	}
+ 
+@@ -581,7 +584,7 @@
+ 	pvr_fw_trace_fini(pvr_dev);
+ 
+ err_release_runtime_cfg:
+-	pvr_fw_object_destroy(fw_mem->runtime_cfg_obj);
++	pvr_fw_object_unmap_and_destroy(fw_mem->runtime_cfg_obj);
+ 
+ err_release_gpu_util_fwcb:
+ 	pvr_fw_object_unmap_and_destroy(fw_mem->gpu_util_fwcb_obj);
+@@ -611,7 +614,7 @@
+ 	struct pvr_fw_mem *fw_mem = &fw_dev->mem;
+ 
+ 	pvr_fw_trace_fini(pvr_dev);
+-	pvr_fw_object_destroy(fw_mem->runtime_cfg_obj);
++	pvr_fw_object_unmap_and_destroy(fw_mem->runtime_cfg_obj);
+ 	pvr_fw_object_unmap_and_destroy(fw_mem->gpu_util_fwcb_obj);
+ 	pvr_fw_object_destroy(fw_mem->fault_page_obj);
+ 	pvr_fw_object_unmap_and_destroy(fw_mem->sysdata_obj);
+@@ -1131,6 +1134,65 @@
+ }
+ 
+ /**
++ * pvr_fw_time_corr_rate_changed() - Publish an entry for a new core clock rate
++ * @pvr_dev: Target PowerVR device.
++ *
++ * ROGUE_CR_TIMER counts core clock cycles, so its rate follows the core clock.
++ * The firmware converts a CR delta with the factor of the newest entry, which
++ * was derived from the rate that was set when it was published. After a rate
++ * change a new entry starts at the current CR and OS time with the factor of
++ * the new rate. It starts no earlier than where the firmware's time is, so the
++ * timestamps do not go backwards.
++ *
++ * The entry is taken after the clock switch has returned; until then the
++ * firmware converts with the old factor, which misplaces a timestamp written in
++ * that window by at most the window's length times the relative rate change.
++ *
++ * Does nothing unless the firmware runs. The GPU must be powered, and the
++ * caller must hold &pvr_device.clk_lock.
++ */
++void
++pvr_fw_time_corr_rate_changed(struct pvr_device *pvr_dev)
++{
++	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
++	u64 core_clock_hz = clk_get_rate(pvr_dev->core_clk);
++	u64 cr, os;
++
++	if (WARN_ON(!core_clock_hz))
++		return;
++
++	mutex_lock(&fw_dev->time_corr.lock);
++	if (fw_dev->time_corr.valid) {
++		pvr_fw_time_corr_sample(pvr_dev, &cr, &os);
++		pvr_fw_time_corr_publish(pvr_dev, cr,
++					 max(os, pvr_fw_time_corr_estimate(fw_dev, cr)),
++					 pvr_fw_time_corr_factor(core_clock_hz));
++	}
++	mutex_unlock(&fw_dev->time_corr.lock);
++}
++
++/**
++ * pvr_fw_set_core_clock_speed() - Store the core clock rate for the firmware
++ * @pvr_dev: Target PowerVR device.
++ * @clock_speed_hz: Core clock rate, in Hz.
++ *
++ * The firmware reads SYSINIT's rate when it boots and the runtime config's when
++ * it handles ROGUE_FWIF_KCCB_CMD_CORECLKSPEEDCHANGE. Both are set at creation
++ * only, so a rate that changes later has to be written here.
++ */
++void
++pvr_fw_set_core_clock_speed(struct pvr_device *pvr_dev, u32 clock_speed_hz)
++{
++	struct pvr_fw_device *fw_dev = &pvr_dev->fw_dev;
++
++	WRITE_ONCE(fw_dev->fwif_sysinit->initial_core_clock_speed, clock_speed_hz);
++	WRITE_ONCE(fw_dev->fwif_runtime_cfg->core_clock_speed, clock_speed_hz);
++
++	/* Visible before any command that makes the firmware read them. */
++	wmb();
++}
++
++/**
+  * pvr_fw_init() - Initialise and boot firmware
+  * @pvr_dev: Target PowerVR device
+  *
+--- a/drivers/gpu/drm/imagination/pvr_fw.h
++++ b/drivers/gpu/drm/imagination/pvr_fw.h
+@@ -367,6 +367,9 @@
+ 	/** @fwif_osdata: Pointer to CPU mapping of FW OSDATA structure. */
+ 	struct rogue_fwif_osdata *fwif_osdata;
+ 
++	/** @fwif_runtime_cfg: Pointer to CPU mapping of FW runtime config structure. */
++	struct rogue_fwif_runtime_cfg *fwif_runtime_cfg;
++
+ 	/** @gpu_util_fwcb: Pointer to CPU mapping of FW GPU utilisation control structure. */
+ 	struct rogue_fwif_gpu_util_fwcb *gpu_util_fwcb;
+ 
+@@ -433,6 +436,8 @@
+ void pvr_fw_time_corr_start(struct pvr_device *pvr_dev);
+ void pvr_fw_time_corr_stop(struct pvr_device *pvr_dev);
+ void pvr_fw_time_corr_refresh(struct pvr_device *pvr_dev);
++void pvr_fw_time_corr_rate_changed(struct pvr_device *pvr_dev);
++void pvr_fw_set_core_clock_speed(struct pvr_device *pvr_dev, u32 clock_speed_hz);
+ u64 pvr_fw_time_corr_now_ns(void);
+ 
+ int
+--- a/drivers/gpu/drm/imagination/pvr_power.c
++++ b/drivers/gpu/drm/imagination/pvr_power.c
+@@ -152,9 +152,13 @@
+ 	if (rpm_resume)
+ 		enable_irq(pvr_dev->irq);
+ 
++	/* The core clock may have changed while the firmware was off. */
++	mutex_lock(&pvr_dev->clk_lock);
++	pvr_fw_set_core_clock_speed(pvr_dev, clk_get_rate(pvr_dev->core_clk));
++
+ 	err = pvr_fw_start(pvr_dev);
+ 	if (err)
+-		goto out;
++		goto out_unlock;
+ 
+ 	err = pvr_wait_for_fw_boot(pvr_dev);
+ 	if (err) {
+@@ -165,17 +169,20 @@
+ 		 * gates the clocks right after this returns.
+ 		 */
+ 		pvr_fw_stop_force(pvr_dev);
+-		goto out;
++		goto out_unlock;
+ 	}
+ 
+ 	pvr_fw_time_corr_start(pvr_dev);
++	mutex_unlock(&pvr_dev->clk_lock);
+ 
+ 	queue_delayed_work(pvr_dev->sched_wq, &pvr_dev->watchdog.work,
+ 			   msecs_to_jiffies(WATCHDOG_TIME_MS));
+ 
+ 	return 0;
+ 
+-out:
++out_unlock:
++	mutex_unlock(&pvr_dev->clk_lock);
++
+ 	if (rpm_resume)
+ 		disable_irq(pvr_dev->irq);
+ 

@@ -1,0 +1,205 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] arm64: dts: a733: GPU voltage by speed bin
+
+`arm64-dts-a733-gpu-opp-ladder-on-the-gpu0-clk-mux` gave every die the
+vendor's vfdefault column, the highest at every rate. Give each bin the
+column the vendor ships for it, and keep vfdefault for every die this tree
+cannot place.
+
+The bin. The SID word at fuse offset 0x4c carries the speed bin in bits
+[15:8] and a second copy in [23:16]; the CPU tables already read it
+(`nvmem-cpufreq-a733-speed-bin-from-efuse`, read back on several dies). The
+GPU gets bits [15:8] of that word as cell gpu_speed_bin (reg = <0x4c 0x4>,
+bits = <8 8>); a cell at 0x4d would be unaligned to the SID's nvmem stride
+of 4, which fails the registration of the whole provider. The second copy is
+not read. The user manual documents the SID's place in the memory map, not
+this field.
+
+The columns. The vendor's GPU driver takes the SoC's DVFS code, maps it
+through vf_mapping_table and reads opp-microvolt-vf<mapped value> from its
+gpu-opp-table (Allwinner BSP: rgx_sunxi/sunxi_platform.c sunxi_get_opp(),
+configs/linux-6.6/sun60iw2p1-cpu-vf.dtsi, configs/linux-6.6/sun60iw2p1.dtsi).
+For the bins the CPU tables carry:
+
+  fuse  column   800 MHz  1008 MHz
+  0x03  vf0300    820 mV    940 mV
+  0x04  vf0400    800 mV    900 mV
+  0x05  vf0500    800 mV    880 mV
+  0x06  vf0600    800 mV    920 mV
+  0x14  vf0401    800 mV    880 mV
+  0x15  vf0501    800 mV    860 mV
+  0x01  vf0100    840 mV    960 mV   (= vfdefault)
+  0x02  vf0200    840 mV    960 mV   (= vfdefault)
+
+400 and 600 MHz are 800 mV in every column. Rows are selected with
+opp-supported-hw, one bit per raw fuse value; the vfdefault rows carry every
+bit except the six bins with rows of their own (0xffcfff87), so 0x00, 0x11,
+0x12 and any value without a row get the highest voltage. Every bin has
+exactly one row per rate. All values lie in VDD-GPU's recommended range
+(A733 datasheet V1.01, Table 5-2, PDF p. 94).
+
+Bins read on A733 dies so far: 0x04 and 0x05. The vendor stack has never run
+these columns on them; it runs the GPU fixed at 600 MHz.
+
+Assisted-by: Claude
+---
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
+@@ -1129,6 +1129,17 @@
+ 			};
+ 
+ 			/*
++			 * The same speed bin for the GPU: bits [15:8] of the word
++			 * above. The cell is word-aligned, as the SID's nvmem
++			 * stride of 4 requires; the second copy in [23:16] is
++			 * not read.
++			 */
++			gpu_speed_bin: gpu-speed-bin@4c {
++				reg = <0x4c 0x4>;
++				bits = <8 8>;
++			};
++
++			/*
+ 			 * THS factory calibration, fuse offsets 0x44..0x4f =
+ 			 * ARM 0x03006244..0x0300624f: ft_temp and one raw
+ 			 * code per sensor, packed 12-bit (the unpacking is in
+@@ -3542,6 +3553,8 @@
+ 			assigned-clock-rates = <0>, <1008000000>;
+ 			operating-points-v2 = <&gpu_opp_table>;
+ 			power-supply = <&reg_dcdc4>;
++			nvmem-cells = <&gpu_speed_bin>;
++			nvmem-cell-names = "speed-bin";
+ 			#cooling-cells = <2>;
+ 			status = "okay";
+ 		};
+@@ -3550,13 +3563,9 @@
+ 
+ / {
+ 	/*
+-	 * GPU OPPs: the four rows of the vendor's GPU table (Allwinner BSP
+-	 * configs/linux-6.6/sun60iw2p1.dtsi, gpu-opp-table) at their
+-	 * opp-microvolt-vfdefault values, the column the vendor applies when it
+-	 * cannot place a die in a bin. The vendor's per-bin columns are lower
+-	 * (down to 860 mV at 1008 MHz); this tree has no way to hand a bin to
+-	 * the GPU's OPP table, so it carries the column that is safe for every
+-	 * die.
++	 * GPU OPPs: the four rates of the vendor's GPU table (Allwinner BSP
++	 * configs/linux-6.6/sun60iw2p1.dtsi, gpu-opp-table) with the voltage of
++	 * the die's speed bin.
+ 	 *
+ 	 * Every voltage lies in VDD-GPU's recommended range, 0.80-0.96 V (A733
+ 	 * datasheet V1.01, Table 5-2, PDF p. 94), the same window the board's
+@@ -3566,9 +3575,40 @@
+ 	 * -- the vendor's driver lists the same PERI0 taps as its rate sources.
+ 	 * Rates from the mask divider are not used (ccu-sun60iw2.c, GPU block):
+ 	 * a masked rate needs the voltage of its source, not of its average.
+-	 * 600 MHz at 800 mV is also the operating point the vendor stack runs
+-	 * on this silicon, and 1008 MHz at 960 mV the one this tree pinned
+-	 * before it had a ladder.
++	 *
++	 * Bins. drm/imagination reads the bin from gpu_speed_bin and keeps the
++	 * OPPs whose opp-supported-hw has BIT(bin); the bit position is the
++	 * raw fuse value, as for the CPU tables. The voltage per bin is the
++	 * vendor's: its GPU driver takes the SoC's DVFS code (DVFS_EFUSE_OFF
++	 * 0x4c), maps it through vf_mapping_table (sun60iw2p1-cpu-vf.dtsi, the
++	 * table the CPU tables above follow) and uses opp-microvolt-vf<mapped
++	 * value> (Allwinner BSP, rgx_sunxi/sunxi_platform.c, sunxi_get_opp()). The
++	 * bins carried are the CPU tables' set, with their columns:
++	 *
++	 *   fuse  column   800 MHz  1008 MHz
++	 *   0x03  vf0300    820 mV    940 mV
++	 *   0x04  vf0400    800 mV    900 mV
++	 *   0x05  vf0500    800 mV    880 mV
++	 *   0x06  vf0600    800 mV    920 mV
++	 *   0x14  vf0401    800 mV    880 mV
++	 *   0x15  vf0501    800 mV    860 mV
++	 *   0x01  vf0100    840 mV    960 mV   = vfdefault
++	 *   0x02  vf0200    840 mV    960 mV   = vfdefault
++	 *
++	 * 400 and 600 MHz are 800 mV in every column. Every bin not named
++	 * above -- 0x00 (an unprogrammed fuse reads the same), 0x11, 0x12
++	 * (which have no CPU column here), any other value, and a die with the
++	 * second fuse copy programmed -- gets vfdefault, the column the vendor
++	 * uses when it cannot place a die, and the highest at every rate. The
++	 * fallback rows therefore carry every bit but the six bins with rows
++	 * of their own: 0xffcfff87.
++	 *
++	 * Bins read on A733 dies so far: 0x04 and 0x05 (CPU table comment
++	 * above). The vendor stack never applied these columns on them: its
++	 * GPU DVFS is compiled out, the GPU runs 600 MHz at the 800 mV the
++	 * rail boots with. Both bins have run all four rates at their own
++	 * column; before this, every die ran fixed at 1008 MHz and 960 mV,
++	 * the default column.
+ 	 */
+ 	gpu_opp_table: opp-table-gpu {
+ 		compatible = "operating-points-v2";
+@@ -3576,21 +3616,69 @@
+ 		opp-400000000 {
+ 			opp-hz = /bits/ 64 <400000000>;
+ 			opp-microvolt = <800000>;
++			opp-supported-hw = <0xffffffff>;
+ 		};
+ 
+ 		opp-600000000 {
+ 			opp-hz = /bits/ 64 <600000000>;
+ 			opp-microvolt = <800000>;
++			opp-supported-hw = <0xffffffff>;
+ 		};
+ 
+ 		opp-800000000 {
+ 			opp-hz = /bits/ 64 <800000000>;
+ 			opp-microvolt = <840000>;
++			opp-supported-hw = <0xffcfff87>;
++		};
++
++		opp-800000000-speed3 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <820000>;
++			opp-supported-hw = <0x00000008>;
++		};
++
++		/* bins 0x04, 0x05, 0x06, 0x14, 0x15 */
++		opp-800000000-speed4 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <800000>;
++			opp-supported-hw = <0x00300070>;
+ 		};
+ 
+ 		opp-1008000000 {
+ 			opp-hz = /bits/ 64 <1008000000>;
+ 			opp-microvolt = <960000>;
++			opp-supported-hw = <0xffcfff87>;
++		};
++
++		opp-1008000000-speed3 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <940000>;
++			opp-supported-hw = <0x00000008>;
++		};
++
++		opp-1008000000-speed4 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <900000>;
++			opp-supported-hw = <0x00000010>;
++		};
++
++		/* bins 0x05 and 0x14 */
++		opp-1008000000-speed5 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <880000>;
++			opp-supported-hw = <0x00100020>;
++		};
++
++		opp-1008000000-speed6 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <920000>;
++			opp-supported-hw = <0x00000040>;
++		};
++
++		opp-1008000000-speed21 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <860000>;
++			opp-supported-hw = <0x00200000>;
+ 		};
+ 	};
+ 

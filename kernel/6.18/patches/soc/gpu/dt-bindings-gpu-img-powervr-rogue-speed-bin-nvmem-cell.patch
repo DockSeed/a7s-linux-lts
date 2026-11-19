@@ -1,0 +1,29 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] dt-bindings: gpu: img,powervr-rogue: speed-bin nvmem cell
+
+drm/imagination can select OPPs by the die's speed bin
+(`drm-imagination-pick-the-opps-of-the-die-s-speed-bin`). Allow one nvmem
+cell named "speed-bin"; the OPPs used are those whose opp-supported-hw has
+BIT(speed bin) set.
+
+Assisted-by: Claude
+---
+--- a/Documentation/devicetree/bindings/gpu/img,powervr-rogue.yaml
++++ b/Documentation/devicetree/bindings/gpu/img,powervr-rogue.yaml
+@@ -82,6 +82,16 @@
+   "#cooling-cells":
+     const: 2
+ 
++  nvmem-cells:
++    items:
++      - description:
++          The die's speed bin. Only the OPPs whose opp-supported-hw has bit
++          BIT(speed bin) set are used; a bin of 32 or more counts as 0.
++
++  nvmem-cell-names:
++    items:
++      - const: speed-bin
++
+ required:
+   - compatible
+   - reg

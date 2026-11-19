@@ -1,0 +1,30 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] dt-bindings: gpu: img,powervr-rogue: OPP table, supply and
+ cooling cells
+
+drm/imagination can scale its core clock with an OPP table
+(`drm-imagination-scale-the-core-clock-with-the-firmware-s-utilisation`).
+Allow operating-points-v2, the supply the OPPs set (power-supply) and
+#cooling-cells for the devfreq cooling device. All three are optional.
+
+Assisted-by: Claude
+---
+--- a/Documentation/devicetree/bindings/gpu/img,powervr-rogue.yaml
++++ b/Documentation/devicetree/bindings/gpu/img,powervr-rogue.yaml
+@@ -72,6 +72,16 @@
+   resets:
+     maxItems: 1
+ 
++  operating-points-v2: true
++
++  power-supply:
++    description:
++      Supply of the GPU core. With an OPP table it is set to the voltage of
++      the current OPP.
++
++  "#cooling-cells":
++    const: 2
++
+ required:
+   - compatible
+   - reg

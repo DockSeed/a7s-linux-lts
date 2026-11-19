@@ -15,7 +15,27 @@ may be short).
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The GPU scales its clock and VDD-GPU with its load instead of running fixed
+  at 1008 MHz / 960 mV: 400, 600, 800 and 1008 MHz, each a source of the GPU
+  clock's mux, chosen by the `simple_ondemand` devfreq governor
+  (`/sys/class/devfreq/1800000.gpu`) from the firmware's utilisation data
+  (ACTIVE over IDLE + ACTIVE + BLOCKED). The voltage follows the die's speed
+  bin (fuse word 0x4c, bits 15:8), the column the vendor ships for that bin;
+  a die without a known bin gets the vendor's default column.
+  `echo performance > /sys/class/devfreq/1800000.gpu/governor` keeps it at
+  1008 MHz as before. Every rate change publishes a new timer correlation
+  entry for the firmware's timestamps.
+- The GPU starts at 600 MHz; DCDC4 (VDD-GPU) has a window instead of a fixed
+  960 mV.
+
+### Added
+
+- Thermal: the GPU zone throttles the GPU from 90 C (a devfreq cooling
+  device). The other zones are unchanged.
+- `CONFIG_DEVFREQ_THERMAL`, and the devfreq governors `simple_ondemand`,
+  `performance` and `userspace` built in.
 
 ## [6.18.64-R1] - 2026-11-19
 

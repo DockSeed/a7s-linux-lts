@@ -1,0 +1,119 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] clk: sunxi-ng: a733: move the GPU clock by its mux only
+
+GPU0_CLK gets its lower rates from the mux, no longer from the mask divider
+or from PLL_GPU0. Two changes in gpu0:
+
+1. The divider table keeps only M = 0. GPU0_DIV1 masks cycles (UM V1.00
+   4.1.4.4, PDF p. 49): the remaining cycles keep the source's period, so a
+   masked rate needs the voltage of its source, not of its average. On silicon
+   a render test with a per-pixel reference fails at 1008 MHz with M = 8
+   ("504 MHz") on 800 mV and passes on 960 mV. A table entry turns into an
+   OPP the moment a consumer asks for that rate, and the failure is silent.
+
+2. No CLK_SET_RATE_PARENT and no CLK_SET_RATE_NO_REPARENT. A PLL's factors
+   change only with its output gate closed (UM V1.00 4.1.4.1, PLL Frequency
+   Modulation, step 2, PDF p. 48), and a PLL_GPU0 relock under a clocked GPU
+   stops this SoC. Without SET_RATE_PARENT a request never reaches the PLL;
+   without NO_REPARENT ccu_mux_helper_determine_rate() picks the source whose
+   rate matches. With /1 the only divider, each of GPUPLL, PERI0_800M, 600M,
+   400M, 300M and 200M names one rate, so the choice is unambiguous.
+
+GPU0_CLK_SEL "supports glitch-free switching" (UM V1.00 GPU0_CLK_REG, PDF
+p. 148), and the UM's order for changing source and divider together does
+not come into play when the divider stays at /1.
+
+GPUPLL itself is set once by the device tree's assigned-clock-rates, before
+the GPU is clocked, and nothing re-rates it afterwards.
+
+Assisted-by: Claude
+---
+--- a/drivers/clk/sunxi-ng/ccu-sun60iw2.c
++++ b/drivers/clk/sunxi-ng/ccu-sun60iw2.c
+@@ -1761,9 +1761,19 @@
+  * CLK_SRC*((16-M)/16) (4.1.4.4), unlike the other working clocks, which
+  * divide by counting cycles, as the UM says one
+  * sentence earlier. Only five of the sixteen field values land on an integer
+- * ratio -- M = 0, 8, 12, 14, 15 give /1, /2, /4, /8, /16 -- and those five are
+- * the table below. A plain ccu_div or ccu_mp would read the field as a linear
+- * or power-of-two divisor and be wrong at every value but 0.
++ * ratio -- M = 0, 8, 12, 14, 15 give /1, /2, /4, /8, /16. A plain ccu_div or
++ * ccu_mp would read the field as a linear or power-of-two divisor and be
++ * wrong at every value but 0.
++ *
++ * Only M = 0 is offered, because a masked rate is not a lower operating
++ * point. Masking drops cycles; the cycles that remain keep the period of the
++ * source. On silicon, a GPU render test with a per-pixel reference fails
++ * at 1008 MHz with M = 8 ("504 MHz") on 800 mV and passes on 960 mV, the
++ * voltage of 1008 MHz. An OPP table pairs a rate with a voltage, so a masked
++ * rate offered through clk_set_rate() would be paired with the voltage of its
++ * average frequency and fail silently. The GPU's lower rates come from the
++ * mux instead: PERI0_800M/600M/400M are counting dividers of PLL_PERI0, real
++ * clocks of that period.
+  *
+  * GPU0_UPD (bit 27) is not optional, and its absence is invisible. GPU0 is
+  * one of the four clocks (with NSI, MBUS and DRAM0) whose SEL, DIV1 and
+@@ -1778,17 +1788,26 @@
+  * ccu_gate all set it when the feature is on, so the whole clock is covered
+  * and not only its rate.
+  *
+- * The UM's ordering rule is a constraint on any consumer that changes both
+- * halves at once: going up in frequency, program the divider
+- * before the clock source; going down, do it the other way round,
+- * source first and divider second. Changing only the divider, as done
+- * here, never violates it.
+- * CLK_SET_RATE_NO_REPARENT keeps the framework from wandering
+- * across the mux on a rate request, so a rate change moves the divider alone
+- * and the rule cannot be broken by accident; which source drives the GPU is a
+- * device-tree decision. The same rule's other half -- the reset is
+- * released first and the gating clock is opened afterwards
+- * -- belongs to the consumer's probe order, not here.
++ * A rate request therefore moves the mux and nothing else. GPU0_CLK_SEL
++ * "supports glitch-free switching" (UM V1.00 4.1.6.121, GPU0_CLK_REG,
++ * PDF p. 148), and the UM's ordering rule for a clock that changes both
++ * source and divider (4.1.4.4: divider first going up, source first going
++ * down) cannot be broken when the divider never leaves /1.
++ *
++ * No CLK_SET_RATE_PARENT: a request must never reach PLL_GPU0. Changing a
++ * PLL's factors requires its output gate to be closed first (UM 4.1.4.1,
++ * "PLL Frequency Modulation", step 2, PDF p. 48), i.e. the clock stops, and
++ * on this SoC a PLL_GPU0 relock under a clocked GPU stops the whole SoC
++ * without a word. Without the flag the framework only chooses among the
++ * rates the six sources already run at: GPUPLL at the rate the device tree
++ * assigns to it once, before the GPU is clocked, and the PERI0 taps.
++ * CLK_SET_RATE_NO_REPARENT is gone for the same reason it was there: which
++ * source drives the GPU is now the rate request's decision, and with only
++ * /1 in the table each rate names exactly one source.
++ *
++ * The same rule's other half -- the reset is released first and the gating
++ * clock is opened afterwards -- belongs to the consumer's probe order, not
++ * here.
+  *
+  * The mux's six sources are the UM's. All six are
+  * modelled: ccu_mux_helper_get_parent() hands the raw field back as an index,
+@@ -1890,13 +1909,9 @@
+ 	{ .hw = &pll_peri0_200m_clk.hw },		/* 101 PERI0_200M */
+ };
+ 
+-/* GPU0_DIV1 [3:0]: masked cycles per 16, so the ratio is 16/(16-M). */
++/* GPU0_DIV1 [3:0]: masked cycles per 16; only "not masked" is offered. */
+ static struct clk_div_table gpu0_div_table[] = {
+ 	{ .val = 0,  .div = 1  },
+-	{ .val = 8,  .div = 2  },
+-	{ .val = 12, .div = 4  },
+-	{ .val = 14, .div = 8  },
+-	{ .val = 15, .div = 16 },
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -1908,9 +1923,7 @@
+ 		.reg		= 0x0B20,
+ 		.features	= CCU_FEATURE_UPDATE_BIT,
+ 		.hw.init	= CLK_HW_INIT_PARENTS_DATA("gpu0",
+-				gpu0_parents, &ccu_div_ops,
+-				CLK_SET_RATE_PARENT |
+-				CLK_SET_RATE_NO_REPARENT),
++				gpu0_parents, &ccu_div_ops, 0),
+ 	},
+ };
+ 

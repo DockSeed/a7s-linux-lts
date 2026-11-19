@@ -1,0 +1,332 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] arm64: dts: a733: GPU OPP ladder on the GPU0_CLK mux, VDD-GPU
+ follows it
+
+Replace the fixed 1008 MHz / 960 mV point with four OPPs and let the driver's
+devfreq move between them; make the GPU a cooling device of gpu-thermal.
+
+The OPPs are the four rows of the vendor's GPU table (Allwinner BSP
+configs/linux-6.6/sun60iw2p1.dtsi, gpu-opp-table), 400 / 600 / 800 / 1008 MHz at
+800 / 800 / 840 / 960 mV, the opp-microvolt-vfdefault column: the one the vendor
+uses for a die it cannot bin. Its per-bin columns are lower; until the
+following patches hand the speed bin over, the table carries the column that
+is safe for every die. No datasheet has an OPP table for this SoC.
+Each voltage is inside VDD-GPU's recommended range, 0.80 / 0.80 / 0.96 V (A733
+datasheet V1.01, Table 5-2, PDF p. 94).
+
+Each rate is a mux source at M = 0 -- GPUPLL for 1008 MHz, PERI0_800M, 600M and
+400M below it -- the same sources the vendor's driver names. No rate comes
+from the mask divider (`clk-sunxi-ng-a733-move-the-gpu-clock-by-its-mux-only`).
+
+DCDC4 gets the window 800-960 mV: Table 5-2's range and the schematic's for
+this rail (v1.10, p. 4, "DCDC4 0.8V-0.96V VDD-GPU"). The rail boots at 800 mV,
+inside the window, so nothing is written at PMIC probe.
+
+Start-up order, so that no moment runs a rate above its voltage:
+assigned-clocks first switch the mux to PERI0_600M, then set GPUPLL to
+1008 MHz once, while the GPU is still unclocked. The driver binds at 600 MHz
+on 800 mV, a row of the table and the operating point the vendor stack runs on
+this silicon; devfreq then raises the supply before the clock. Without the
+driver's devfreq the GPU stays at 600 MHz.
+
+gpu-thermal gets a passive trip at 90 C mapped onto the GPU, the CPU zones'
+trip for the CPU zones' reasons (datasheet V1.01 Table 6-2, PDF p. 137: 115 C
+continuous; UM V1.00 7.1.1, PDF p. 361: +-3 C sensor error from 60 C).
+
+Assisted-by: Claude
+---
+--- a/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
++++ b/arch/arm64/boot/dts/allwinner/sun60i-a733-cubie-a7s.dts
+@@ -3072,63 +3072,32 @@
+ 
+ 					/*
+ 					 * DCDC4 = VDD-GPU, volt register 0x15, same
+-					 * coding as the two CPU rails above. It gets a
+-					 * node -- and therefore a window, and therefore
+-					 * the right to be written -- because this series
+-					 * also pins its consumer: the GPU node one file
+-					 * away asks for 1008 MHz, and 1008 MHz is the row
+-					 * of the vendor OPP table that reads 960 mV.
++					 * coding as the two CPU rails above. Its consumer
++					 * is the GPU's OPP table: drm/imagination sets it
++					 * through power-supply with every core clock
++					 * change.
+ 					 *
+-					 * This patch and the 1008 MHz pin are one
+-					 * change. Split them and one half is a hazard:
+-					 * this rail alone at 960 mV is merely wasteful,
+-					 * but the clock alone at 1008 MHz runs the GPU
+-					 * under its voltage curve, which is the failure
+-					 * mode that does not announce itself.
+-					 *
+-					 * Order is right by construction: the regulator
+-					 * core writes this at PMIC probe, and the GPU's
+-					 * rate is applied when powervr probes, seconds
+-					 * later. Voltage up first, then clock.
+-					 *
+-					 * min == max on purpose. This is a FIXED
+-					 * operating point, not a ladder: there is no OPP
+-					 * table and no devfreq, and drm/powervr reads no
+-					 * regulator at all (grepped in the tree we build:
+-					 * zero hits for "regulator" and "-supply" under
+-					 * drivers/gpu/drm/imagination/). A wider window
+-					 * would therefore never be narrowed by anyone --
+-					 * a window is enforcement, not a wish.
++					 * Window 800-960 mV: VDD-GPU's recommended range
++					 * (A733 datasheet V1.01, Table 5-2, PDF p. 94:
++					 * 0.80 / 0.80 / 0.96 V) and the schematic's for
++					 * this rail (v1.10, p. 4, "DCDC4 0.8V-0.96V");
++					 * 240 mV under the absolute maximum of 1.2 V
++					 * (Table 5-1, PDF p. 92). The rail boots at
++					 * 800 mV, which is inside, so the regulator core
++					 * writes nothing at PMIC probe; the GPU's clock is
++					 * at PERI0_600M until the OPP core raises the
++					 * rail.
+ 					 *
+ 					 * Silicon, read on the 6 GiB board (i2cget -f -y 1 0x36):
+ 					 *   0x15 = 0x9e -> DVM on, n=30 -> 800 mV
+ 					 *   0x1b = 0x00 -> poly-phase bits [6]/[7] clear,
+ 					 *                  so DCDC4+5 are NOT paralleled
+ 					 *                  and this rail is the GPU's
+-					 *                  alone. First measured
+-					 *                  2026-07-22, re-read 2026-09-08.
+-					 * Windows: schematic rates VDD-GPU 0.8-0.96 V and
+-					 * DS Tab. 5-1 gives -0.3..1.2 V absolute, so 960
+-					 * mV is the top of the design window and stays
+-					 * 240 mV under the limit.
+-					 *
+-					 * 960 mV itself is not derived from any
+-					 * document. No datasheet carries an OPP table for
+-					 * this SoC (freq<->voltage comes
+-					 * from DT/eFuse and is bin-dependent), and the two
+-					 * device trees that do carry one agree with
+-					 * each other only on this pair. It is
+-					 * the vendor's number, adopted because it is the
+-					 * conservative choice among the values and inside
+-					 * the documented window -- and it is owed a
+-					 * measurement, which a GL render test can give:
+-					 * that test fails on wrong PIXELS before the GPU
+-					 * hangs, so walking this rail down until that test
+-					 * breaks measures the real margin on our silicon.
++					 *                  alone.
+ 					 */
+ 					reg_dcdc4: dcdc4 {
+ 						regulator-name = "vdd-gpu";
+-						regulator-min-microvolt = <960000>;
++						regulator-min-microvolt = <800000>;
+ 						regulator-max-microvolt = <960000>;
+ 						regulator-ramp-delay = <1280>;
+ 						regulator-always-on;
+@@ -3501,11 +3470,9 @@
+ 		 *      read 5 = 0x8 and 6 = 0x8 while the vendor driver holds
+ 		 *      the GPU, against 4 (the NPU) = 0x0 with the NPU idle.
+ 		 *
+-		 * What is deliberately not here yet is any rate control:
+-		 * no OPP table, no gpu-supply, no devfreq. This node brings the
+-		 * block up at one fixed, vendor-sanctioned operating point and
+-		 * nothing more. Frequency and voltage move together or not at
+-		 * all, and making them move is its own step.
++		 * Rate control: the core clock and VDD-GPU move together along
++		 * gpu_opp_table (below the node), driven by the driver's
++		 * devfreq; the GPU is also a cooling device of gpu-thermal.
+ 		 *
+ 		 * Where the values come from:
+ 		 *
+@@ -3549,81 +3516,33 @@
+ 			 */
+ 			power-domains = <&pck600 PD_GPU_TOP>;
+ 			/*
+-			 * The parent is pinned and that is a safety
+-			 * property, not a preference. Left alone, GPU0_CLK
+-			 * comes out of reset on SEL=000 (GPUPLL) with M=0,
+-			 * and PLL_GPU0's own reset value is N=70 P0=2 --
+-			 * 840 MHz. Meanwhile VDD-GPU is whatever the boot
+-			 * chain left, measured 800 mV on this board, and the
+-			 * vendor's own OPP table pairs 800 MHz with 840 mV
+-			 * and 1008 MHz with 960 mV. Enabling this node
+-			 * without pinning the source therefore runs the GPU
+-			 * above the voltage curve, which is the one failure
+-			 * mode that does not announce itself.
+-			 *
+-			 * PERI0_600M with the divider at its reset value is
+-			 * exactly the operating point the vendor stack runs
+-			 * on this silicon: measured 2026-08-27 under GL load,
+-			 * GPU0_CLK = 0x82000000 (SEL=010, M=0) with DCDC4 at
+-			 * 800 mV -- and 600 MHz at 800 mV is a row of the
+-			 * vendor OPP table, not an extrapolation.
+-			 *
+-			 * No assigned-clock-rates, deliberately. gpu0
+-			 * carries CLK_SET_RATE_PARENT, and its parent here is
+-			 * a fixed factor off PLL_PERI0 -- the PLL that feeds
+-			 * the whole SoC. A rate request on gpu0 would
+-			 * propagate straight into it. Rate control belongs to
+-			 * an OPP consumer on the GPU's own PLL, which is the
+-			 * next step, not to this line.
+-			 *
+-			 * And GPUPLL cannot serve 600 MHz cleanly anyway:
+-			 * the VCO window is 1.26-2.52 GHz (UM Table 4-2,
+-			 * A733 user manual), so 24 MHz x 50 / 2 = 600 needs
+-			 * a 1200 MHz VCO, below the floor.
+-			 */
+-			/*
+-			 * 1008 MHz on the GPU's own PLL, which replaces the
+-			 * PERI0_600M pin above. The reasoning that put it
+-			 * there is unchanged and still true -- the rest of
+-			 * the argument has now been established.
++			 * Core clock scaling: drm/imagination's devfreq moves
++			 * the core clock along gpu_opp_table and sets DCDC4
++			 * (VDD-GPU) with it, voltage up before the clock and
++			 * down after it (OPP core).
+ 			 *
+-			 * Why GPUPLL can serve this rate when it could not
+-			 * serve 600: the VCO window is 1.272-2.52 GHz (UM
+-			 * Table 4-2, and the driver
+-			 * enforces it as MIN_VCO/MAX_VCO). 600 MHz needs a
+-			 * 1200 MHz VCO, below the floor. 1008 MHz needs
+-			 * 24 MHz x 84 = 2016 MHz, comfortably inside it --
+-			 * so of the vendor's ladder, only the top row is
+-			 * reachable from this PLL at all.
++			 * Each OPP is a source of the GPU0_CLK mux at M = 0:
++			 * GPUPLL for 1008 MHz, PERI0_800M/600M/400M below. The
++			 * CCU offers no masked rate and never re-rates
++			 * PLL_GPU0 on a request (ccu-sun60iw2.c, GPU block),
++			 * so a transition is one glitch-free mux switch (UM
++			 * V1.00 GPU0_CLK_REG, PDF p. 148) and no PLL relock.
+ 			 *
+-			 * One rate request, and the model has exactly one
+-			 * legal answer. gpu0 carries CLK_SET_RATE_PARENT
+-			 * with CLK_SET_RATE_NO_REPARENT, and gpupll carries
+-			 * CLK_SET_RATE_PARENT, so 1008 MHz propagates:
+-			 * gpu0 mask M=0 (/1) -> gpupll 1008 -> P0 must be 2,
+-			 * because P0=1 would ask the VCO for 1008 MHz and
+-			 * the enforced floor refuses it. VCO 2016, P0 2,
+-			 * M 0. Nothing here is a magic number; every step is
+-			 * the only one the window permits.
+-			 *
+-			 * The warning of `arm64-dts-a733-enable-the-gpu-at-the-vendor-s-operating-point` about CLK_SET_RATE_PARENT does
+-			 * not transfer, and that is the whole reason this is
+-			 * now safe: it warned that a rate on gpu0 would
+-			 * propagate into PLL_PERI0, the PLL feeding the whole
+-			 * SoC. With GPUPLL as the parent the request
+-			 * propagates into the GPU's own PLL, which drives
+-			 * nothing else -- "mem" is that same PLL and the
+-			 * driver only clk_prepare_enable()s it, never sets a
+-			 * rate on it (`arm64-dts-a733-gpu-mem-clock-is-the-gpu-pll`).
+-			 *
+-			 * And it is only safe with the DCDC4 node in the
+-			 * same series. 1008 MHz at the 800 mV this rail
+-			 * boots with is an under-volt, and an under-volt does
+-			 * not announce itself.
++			 * assigned-clocks run before the driver binds, with
++			 * the GPU still unclocked: the mux goes to PERI0_600M
++			 * first, then GPUPLL is set to 1008 MHz once (24 MHz x
++			 * 84 = 2016 MHz VCO, inside UM Table 4-2's window, P0 =
++			 * 2). It is never re-rated after that. The GPU starts
++			 * at 600 MHz because that rate is safe at the 800 mV
++			 * DCDC4 boots with: if the driver never brings up
++			 * devfreq, this is where the GPU stays.
+ 			 */
+-			assigned-clocks = <&ccu CLK_GPU0>;
+-			assigned-clock-parents = <&ccu CLK_GPUPLL>;
+-			assigned-clock-rates = <1008000000>;
++			assigned-clocks = <&ccu CLK_GPU0>, <&ccu CLK_GPUPLL>;
++			assigned-clock-parents = <&ccu CLK_PLL_PERI0_600M>, <0>;
++			assigned-clock-rates = <0>, <1008000000>;
++			operating-points-v2 = <&gpu_opp_table>;
++			power-supply = <&reg_dcdc4>;
++			#cooling-cells = <2>;
+ 			status = "okay";
+ 		};
+ 	};
+@@ -3631,6 +3550,51 @@
+ 
+ / {
+ 	/*
++	 * GPU OPPs: the four rows of the vendor's GPU table (Allwinner BSP
++	 * configs/linux-6.6/sun60iw2p1.dtsi, gpu-opp-table) at their
++	 * opp-microvolt-vfdefault values, the column the vendor applies when it
++	 * cannot place a die in a bin. The vendor's per-bin columns are lower
++	 * (down to 860 mV at 1008 MHz); this tree has no way to hand a bin to
++	 * the GPU's OPP table, so it carries the column that is safe for every
++	 * die.
++	 *
++	 * Every voltage lies in VDD-GPU's recommended range, 0.80-0.96 V (A733
++	 * datasheet V1.01, Table 5-2, PDF p. 94), the same window the board's
++	 * schematic gives DCDC4 (v1.10, p. 4: "DCDC4 0.8V-0.96V VDD-GPU").
++	 *
++	 * Each rate is a GPU0_CLK mux source at M = 0, a clock of that period
++	 * -- the vendor's driver lists the same PERI0 taps as its rate sources.
++	 * Rates from the mask divider are not used (ccu-sun60iw2.c, GPU block):
++	 * a masked rate needs the voltage of its source, not of its average.
++	 * 600 MHz at 800 mV is also the operating point the vendor stack runs
++	 * on this silicon, and 1008 MHz at 960 mV the one this tree pinned
++	 * before it had a ladder.
++	 */
++	gpu_opp_table: opp-table-gpu {
++		compatible = "operating-points-v2";
++
++		opp-400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <800000>;
++		};
++
++		opp-600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <800000>;
++		};
++
++		opp-800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <840000>;
++		};
++
++		opp-1008000000 {
++			opp-hz = /bits/ 64 <1008000000>;
++			opp-microvolt = <960000>;
++		};
++	};
++
++	/*
+ 	 * A55 cluster (cpu0..cpu5), supplied by DCDC5 = VDD-CPUL.
+ 	 *
+ 	 * Frequencies are 26 MHz * N with the N values read out of
+@@ -4453,13 +4417,12 @@
+  * C, and this tree gains it in `arm64-dts-a733-idle-injection-cooling`.
+  * Until that lands, the 20 C between 90 and 110 has nothing in it.
+  *
+- * Throttling is wired for both clusters and is the only cooling this
+- * tree can offer today: cpufreq-dt owns the CPU-big and CPU-little
+- * policies (`arm64-dts-a733-cpu-clocks-from-cpu-ccu` and
+- * `arm64-dts-a733-cpu-opp-tables-and-supply`), and there is no devfreq
+- * for DDR, NPU or GPU. Those three therefore carry a critical trip and
+- * no cooling map -- an emergency shutdown is real protection, an
+- * unwired passive trip would only look like it.
++ * Throttling is wired for both clusters: cpufreq-dt owns the CPU-big
++ * and CPU-little policies (`arm64-dts-a733-cpu-clocks-from-cpu-ccu` and
++ * `arm64-dts-a733-cpu-opp-tables-and-supply`). The GPU is throttled by
++ * its own devfreq (drm/imagination) from gpu-thermal's passive trip,
++ * the same 90 C as the CPU zones for the same reasons. There is no
++ * devfreq for DDR or NPU.
+  */
+ &cpu0 {
+ 	#cooling-cells = <2>;
+@@ -4700,6 +4663,19 @@
+ 					type = "critical";
+ 					hysteresis = <0>;
+ 				};
++				/* Same passive trip as the CPU zones, see above. */
++				gpu_passive: gpu-trip-1 {
++					temperature = <90000>;
++					type = "passive";
++					hysteresis = <2000>;
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&gpu_passive>;
++					cooling-device = <&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
+ 			};
+ 		};
+ 	};

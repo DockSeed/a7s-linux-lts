@@ -1,0 +1,100 @@
+From: DockSeed <dockseed@proton.me>
+Subject: [PATCH] drm/imagination: pick the OPPs of the die's speed bin
+
+Dies of one GPU differ, and a SoC that grades them burns the grade into a
+fuse; the voltage a rate needs depends on it. Read an optional nvmem cell
+"speed-bin" and hand BIT(bin) to the OPP core as supported_hw, so a device
+tree can carry one row per bin and rate and the OPP core keeps the rows of
+this die. This is the mechanism panfrost uses for its speed-bin cell, with
+the bin as a bit position, as sun50i-cpufreq-nvmem does for the A733's CPU
+tables.
+
+Without the cell nothing changes. A bin that does not fit a 32-bit mask is
+taken as bin 0, so a device tree that gives bin 0 safe rows covers it. A cell
+that is present but cannot be read fails devfreq setup, which leaves the GPU
+at the rate its clock has; guessing a bin would risk an under-volt.
+
+Assisted-by: Claude
+---
+--- a/drivers/gpu/drm/imagination/pvr_devfreq.c
++++ b/drivers/gpu/drm/imagination/pvr_devfreq.c
+@@ -9,11 +9,13 @@
+ 
+ #include <drm/drm_print.h>
+ 
++#include <linux/bitops.h>
+ #include <linux/clk.h>
+ #include <linux/devfreq.h>
+ #include <linux/devfreq_cooling.h>
+ #include <linux/minmax.h>
+ #include <linux/mutex.h>
++#include <linux/nvmem-consumer.h>
+ #include <linux/of.h>
+ #include <linux/pm_opp.h>
+ #include <linux/pm_runtime.h>
+@@ -235,6 +237,44 @@
+ 	return err;
+ }
+ 
++/**
++ * pvr_devfreq_read_speed_bin() - Read the die's speed bin, if the device has one
++ * @dev: GPU device.
++ * @mask_out: Location to store the opp-supported-hw mask for the bin.
++ *
++ * The bin comes from the nvmem cell "speed-bin" and selects the OPPs whose
++ * opp-supported-hw has bit BIT(bin) set, so a device tree can carry one
++ * voltage per bin and frequency. A bin that does not fit the mask is taken
++ * as bin 0.
++ *
++ * Return:
++ *  * 1 if a bin was read and *@mask_out is valid,
++ *  * 0 if the device has no speed-bin cell, or
++ *  * the error from reading the cell.
++ */
++static int
++pvr_devfreq_read_speed_bin(struct device *dev, u32 *mask_out)
++{
++	u32 bin;
++	int err;
++
++	err = nvmem_cell_read_variable_le_u32(dev, "speed-bin", &bin);
++	if (err == -ENOENT || err == -EOPNOTSUPP)
++		return 0;
++	if (err)
++		return err;
++
++	if (bin >= BITS_PER_TYPE(u32)) {
++		dev_warn(dev, "speed bin 0x%x does not fit the OPP mask, using bin 0\n", bin);
++		bin = 0;
++	}
++
++	dev_info(dev, "speed bin %u\n", bin);
++	*mask_out = BIT(bin);
++
++	return 1;
++}
++
+ static int
+ pvr_devfreq_opp_init(struct pvr_device *pvr_dev)
+ {
+@@ -244,11 +284,20 @@
+ 	struct dev_pm_opp_config config = {
+ 		.clk_names = clk_names,
+ 	};
++	u32 supported_hw;
+ 	int err;
+ 
+ 	if (of_property_present(dev->of_node, "power-supply"))
+ 		config.regulator_names = reg_names;
+ 
++	err = pvr_devfreq_read_speed_bin(dev, &supported_hw);
++	if (err < 0)
++		return err;
++	if (err) {
++		config.supported_hw = &supported_hw;
++		config.supported_hw_count = 1;
++	}
++
+ 	err = devm_pm_opp_set_config(dev, &config);
+ 	if (err)
+ 		return err;

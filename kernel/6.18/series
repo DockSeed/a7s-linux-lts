@@ -281,3 +281,10 @@ cve/nvme-fix-command-effects-log-lifetime-for-multipath-heads.patch
 cve/btrfs-don-t-stash-io-uring-encoded-data-across-eagain.patch
 cve/cgroup-cpuset-don-t-access-cpuset-cgrp-subsys-root-in-is-in-v2-mode.patch
 cve/smb-client-fix-use-before-check-of-reparsedatalength-in-reparse-buf-ptr.patch
+soc/clk/clk-sunxi-ng-a733-move-the-gpu-clock-by-its-mux-only.patch
+soc/gpu/dt-bindings-gpu-img-powervr-rogue-opp-table-supply-and-cooling-cells.patch
+soc/gpu/drm-imagination-scale-the-core-clock-with-the-firmware-s-utilisation.patch
+soc/dts/arm64-dts-a733-gpu-opp-ladder-on-the-gpu0-clk-mux.patch
+soc/gpu/dt-bindings-gpu-img-powervr-rogue-speed-bin-nvmem-cell.patch
+soc/gpu/drm-imagination-pick-the-opps-of-the-die-s-speed-bin.patch
+soc/dts/arm64-dts-a733-gpu-voltage-by-speed-bin.patch
