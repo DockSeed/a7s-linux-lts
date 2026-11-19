@@ -15,6 +15,14 @@ may be short).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [6.18.64-R2] - 2026-11-19
+
+The recipe of 6.18.64-R1 with GPU DVFS and GPU job timestamps, tested on a
+speed bin 5 board and, with throttling under real heat, on a speed bin 4 board.
+`sudo a7s-kernel-update` on a board with an earlier release installs this one.
+
 ### Changed
 
 - The GPU scales its clock and VDD-GPU with its load instead of running fixed
@@ -29,6 +37,14 @@ may be short).
   entry for the firmware's timestamps.
 - The GPU starts at 600 MHz; DCDC4 (VDD-GPU) has a window instead of a fixed
   960 mV.
+- The A733 CCU sets GPU0_CLK through its mux only
+  (`clk-sunxi-ng-a733-move-the-gpu-clock-by-its-mux-only`): the divider keeps
+  only /1, so no masked rate such as 504 MHz can become an operating point,
+  and a rate request no longer reaches PLL_GPU0.
+- The img,powervr-rogue binding allows an OPP table, power-supply,
+  #cooling-cells and a speed-bin nvmem cell
+  (`dt-bindings-gpu-img-powervr-rogue-opp-table-supply-and-cooling-cells`,
+  `dt-bindings-gpu-img-powervr-rogue-speed-bin-nvmem-cell`).
 
 ### Added
 
@@ -36,17 +52,6 @@ may be short).
   device). The other zones are unchanged.
 - `CONFIG_DEVFREQ_THERMAL`, and the devfreq governors `simple_ondemand`,
   `performance` and `userspace` built in.
-
-## [6.18.64-R1] - 2026-11-19
-
-The recipe of 6.18.63-R2 on Linux 6.18.64, with the A733 USB host fix and the
-new WLAN driver (tested as 6.18.63-T1 and -T2). `sudo a7s-kernel-update` on a
-board with an earlier release installs this one. Run it twice there: the
-command of the earlier release installs the kernel with the board's old WLAN
-driver, the second run installs `a7s-aic8800-dkms`.
-
-### Added
-
 - GPU job timestamps: the driver publishes the timer correlation the
   firmware converts its timer with, on CLOCK_MONOTONIC_RAW, after every
   firmware boot and every 2 s while the GPU runs
@@ -58,6 +63,16 @@ driver, the second run installs `a7s-aic8800-dkms`.
   fields at the end of `struct drm_pvr_job`). Reported only for the BXM-4-64
   MC1 with firmware 1.1, where it was measured. Mainline does not have this
   uAPI; a userspace that does not use it sees no change.
+
+## [6.18.64-R1] - 2026-11-19
+
+The recipe of 6.18.63-R2 on Linux 6.18.64, with the A733 USB host fix and the
+new WLAN driver (tested as 6.18.63-T1 and -T2). `sudo a7s-kernel-update` on a
+board with an earlier release installs this one. Run it twice there: the
+command of the earlier release installs the kernel with the board's old WLAN
+driver, the second run installs `a7s-aic8800-dkms`.
+
+### Added
 
 - `a7s-aic8800-dkms`, the WLAN/BT driver source for DKMS, is a release
   file. `a7s-kernel-update` installs it before the kernel packages, so a
