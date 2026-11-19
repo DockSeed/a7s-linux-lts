@@ -116,7 +116,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  }
  
  static int nvme_check_ctrl_fabric_info(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
-@@ -5069,19 +5081,6 @@ void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
+@@ -5068,19 +5080,6 @@ void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
  }
  EXPORT_SYMBOL_GPL(nvme_uninit_ctrl);
  
@@ -136,7 +136,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  static void nvme_free_ctrl(struct device *dev)
  {
  	struct nvme_ctrl *ctrl =
-@@ -5094,7 +5093,6 @@ static void nvme_free_ctrl(struct device *dev)
+@@ -5093,7 +5092,6 @@ static void nvme_free_ctrl(struct device *dev)
  		blk_put_queue(ctrl->fabrics_q);
  	if (!subsys || ctrl->instance != subsys->instance)
  		ida_free(&nvme_instance_ida, ctrl->instance);
@@ -144,7 +144,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	nvme_mpath_uninit(ctrl);
  	cleanup_srcu_struct(&ctrl->srcu);
  	nvme_auth_stop(ctrl);
-@@ -5140,7 +5138,6 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
+@@ -5139,7 +5137,6 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
  
  	mutex_init(&ctrl->scan_lock);
  	INIT_LIST_HEAD(&ctrl->namespaces);

@@ -15,6 +15,16 @@ may be short).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [6.18.64-R1] - 2026-11-19
+
+The recipe of 6.18.63-R2 on Linux 6.18.64, with the A733 USB host fix and the
+new WLAN driver (tested as 6.18.63-T1 and -T2). `sudo a7s-kernel-update` on a
+board with an earlier release installs this one. Run it twice there: the
+command of the earlier release installs the kernel with the board's old WLAN
+driver, the second run installs `a7s-aic8800-dkms`.
+
 ### Added
 
 - `a7s-aic8800-dkms`, the WLAN/BT driver source for DKMS, is a release
@@ -53,6 +63,19 @@ may be short).
   plus radxa-pkg/aic8800 pull requests 114 (16 of 17) and 106 unchanged.
   Seven of our patches and the compat patch are dropped, one is added. The
   counter `rx_unknown_msgs` is gone.
+- Linux 6.18.64 (longterm) as the base, up from 6.18.63, with the fixes of that
+  stable release
+  ([ChangeLog-6.18.64](https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.64)).
+- 6.18.64 carries two of the CVE fixes, which are dropped:
+  `smb-client-validate-the-data-area-in-smb2-read` and
+  `smb-client-reject-short-session-setup-responses`.
+- Two CVE fixes regenerated against the new base, because stable changed the
+  surrounding lines: only hunk offsets differ, not the patched code.
+  `mm-fix-deferred-split-queue-races-during-migration` and
+  `nvme-fix-command-effects-log-lifetime-for-multipath-heads`. The rest of the
+  series applies unchanged at fuzz 0 without offsets.
+- None of the backports in `kernel/6.18/patches/backport/` is in 6.18.64, so
+  all stay.
 
 ## [6.18.63-R2] - 2026-11-15
 

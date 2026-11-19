@@ -278,5 +278,3 @@ cve/nvme-fix-command-effects-log-lifetime-for-multipath-heads.patch
 cve/btrfs-don-t-stash-io-uring-encoded-data-across-eagain.patch
 cve/cgroup-cpuset-don-t-access-cpuset-cgrp-subsys-root-in-is-in-v2-mode.patch
 cve/smb-client-fix-use-before-check-of-reparsedatalength-in-reparse-buf-ptr.patch
-cve/smb-client-validate-the-data-area-in-smb2-read.patch
-cve/smb-client-reject-short-session-setup-responses.patch

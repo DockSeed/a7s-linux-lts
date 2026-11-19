@@ -7,8 +7,8 @@
 #
 #   sudo a7s-kernel-update              the latest release (GitHub leaves drafts
 #                                       and pre-releases out of "latest")
-#   sudo a7s-kernel-update v6.18.63-R1  this release
-#   sudo a7s-kernel-update v6.18.63-T1  a published test build (pre-release)
+#   sudo a7s-kernel-update v6.18.64-R1  this release
+#   sudo a7s-kernel-update v6.18.64-T1  a published test build (pre-release)
 #
 # It downloads SHA256SUMS of the release, takes the names of the packages
 # (linux-image, linux-headers, a7s-kernel-hook, a7s-aic8800-dkms) from it, downloads them to a new
@@ -47,8 +47,8 @@ usage() {
 a7s-kernel-update -- install the newest kernel release of a7s-linux-lts
 
   sudo a7s-kernel-update              the latest release
-  sudo a7s-kernel-update v6.18.63-R1  this release
-  sudo a7s-kernel-update v6.18.63-T1  a test build (a published pre-release)
+  sudo a7s-kernel-update v6.18.64-R1  this release
+  sudo a7s-kernel-update v6.18.64-T1  a test build (a published pre-release)
 
 1. It downloads the packages of the release and checks their sha256.
 2. It installs them; a7s-kernel-hook makes the new kernel the next boot.
@@ -94,7 +94,7 @@ if [ -z "${tag}" ]; then
 elif printf '%s\n' "${tag}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-[RT][0-9]+$'; then
 	base="${RELEASES_URL}/download/${tag}"
 else
-	die "'${tag}' is not a release tag; use one like v6.18.63-R1 (or -T1 for a test build), or none for the latest release"
+	die "'${tag}' is not a release tag; use one like v6.18.64-R1 (or -T1 for a test build), or none for the latest release"
 fi
 case "${tag}" in *-T*) say "${tag} is a test build, not a release." ;; esac
 
