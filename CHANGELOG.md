@@ -17,10 +17,16 @@ may be short).
 
 ### Fixed
 
-- GPU: a clock change made while the GPU was still resuming did not reach the
+- GPU: a clock change made while the GPU was still resuming, or while a reset
+  that had just restarted the firmware still held it, did not reach the
   firmware, which kept converting job timestamps with the old rate until the
   next refresh and kept the old rate until the next change; the watchdog now
   passes such a change on.
+
+### Known limits
+
+- GPU timestamp buffers: the 4 MiB are per device, not per client; one client
+  can take them all, and the others get `-ENOSPC`.
 - GPU: a GPU supply or speed-bin cell that is not ready yet (`-EPROBE_DEFER`)
   defers the GPU's probe instead of leaving it at a fixed clock.
 

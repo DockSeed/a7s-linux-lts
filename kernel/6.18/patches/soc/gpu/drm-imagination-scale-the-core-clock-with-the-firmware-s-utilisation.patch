@@ -33,11 +33,11 @@ the new rate. Then ROGUE_FWIF_KCCB_CMD_CORECLKSPEEDCHANGE follows. All of that
 only happens if the GPU is already active (pm_runtime_get_if_active()) and no
 reset holds reset_sem (down_read_trylock()), so the governor never powers the
 GPU and never waits for a reset; a reset publishes its own correlation when it
-restarts the firmware. pm_runtime_get_if_active() also refuses while a
-runtime resume is still in progress: a resume that took clk_lock first has
-booted the firmware with the previous rate, and the governor then switches
-the clock before the GPU counts as active. Such a change is marked, and the
-first watchdog tick (every 500 ms) that finds the GPU in use passes it on with
+restarts the firmware. A firmware can still have booted with the previous
+rate: a runtime resume that took clk_lock first (pm_runtime_get_if_active()
+refuses until it is done), or a reset that restarted the firmware and still
+holds reset_sem. A change is therefore marked until the firmware is told, and
+the first watchdog tick (every 500 ms) that finds the GPU in use passes it on with
 pvr_devfreq_sync_fw(); a GPU that goes idle first is powered off and boots
 with the rate from SYSINIT. The entry is taken after the clock switch
 returned, so a timestamp written in that short window is converted with the
@@ -82,7 +82,7 @@ Assisted-by: Claude
  	pvr_drv.o \
 --- /dev/null
 +++ b/drivers/gpu/drm/imagination/pvr_devfreq.c
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,382 @@
 +// SPDX-License-Identifier: GPL-2.0-only OR MIT
 +
 +#include "pvr_devfreq.h"
@@ -262,15 +262,17 @@ Assisted-by: Claude
 +	pvr_fw_set_core_clock_speed(pvr_dev, rate);
 +
 +	/*
-+	 * Also 0 while a runtime resume is still in progress. A resume that took
-+	 * &pvr_device.clk_lock before us has booted the firmware with the
-+	 * previous rate, so leave the change to pvr_devfreq_sync_fw().
++	 * A firmware that booted before the change still has the previous rate:
++	 * one whose runtime resume took &pvr_device.clk_lock before us (the GPU
++	 * is not active yet), or one that a reset restarted and still holds
++	 * reset_sem for. Mark the change until the firmware is told, so that
++	 * pvr_devfreq_sync_fw() passes it on if we cannot.
 +	 */
-+	if (pm_runtime_get_if_active(dev) <= 0) {
-+		if (changed)
-+			WRITE_ONCE(pvr_dev->devfreq.fw_stale, true);
++	if (changed)
++		WRITE_ONCE(pvr_dev->devfreq.fw_stale, true);
++
++	if (pm_runtime_get_if_active(dev) <= 0)
 +		return;
-+	}
 +
 +	if (!down_read_trylock(&pvr_dev->reset_sem))
 +		goto out_put;
@@ -429,7 +431,8 @@ Assisted-by: Claude
 + * @pvr_dev: Target PowerVR device.
 + *
 + * Passes on a rate change that pvr_devfreq_update_fw() could not, because the
-+ * GPU was still resuming. The firmware must run and the GPU must be powered.
++ * GPU was still resuming or a reset held reset_sem. The firmware must run and
++ * the GPU must be powered.
 + */
 +void
 +pvr_devfreq_sync_fw(struct pvr_device *pvr_dev)

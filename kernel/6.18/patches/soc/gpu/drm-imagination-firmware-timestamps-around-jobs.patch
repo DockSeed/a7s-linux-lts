@@ -21,7 +21,8 @@ uAPI, kept compatible in both directions:
     from the values mainline allocates in order.
   - DRM_PVR_BO_FW_TIMESTAMPS (bit 32) creates a buffer the firmware can write
     to: at most 64 KiB each, 4 MiB together per device, not exportable, not
-    with DRM_PVR_BO_PM_FW_PROTECT.
+    with DRM_PVR_BO_PM_FW_PROTECT. The 4 MiB are per device, not per client:
+    one client can take them all, and the others get -ENOSPC.
   - struct drm_pvr_job gets timestamp_flags (PRE, POST), timestamp_bo_handle
     and the two offsets. drm_pvr_job is read with copy_struct_from_user(), so
     an older userspace passes the shorter struct and gets no timestamps, and
