@@ -15,7 +15,14 @@ may be short).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- GPU: a clock change made while the GPU was still resuming did not reach the
+  firmware, which kept converting job timestamps with the old rate until the
+  next refresh and kept the old rate until the next change; the watchdog now
+  passes such a change on.
+- GPU: a GPU supply or speed-bin cell that is not ready yet (`-EPROBE_DEFER`)
+  defers the GPU's probe instead of leaving it at a fixed clock.
 
 ## [6.18.64-R2] - 2026-11-19
 

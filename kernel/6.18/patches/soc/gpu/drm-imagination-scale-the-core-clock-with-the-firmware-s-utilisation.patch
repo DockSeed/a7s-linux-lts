@@ -33,9 +33,15 @@ the new rate. Then ROGUE_FWIF_KCCB_CMD_CORECLKSPEEDCHANGE follows. All of that
 only happens if the GPU is already active (pm_runtime_get_if_active()) and no
 reset holds reset_sem (down_read_trylock()), so the governor never powers the
 GPU and never waits for a reset; a reset publishes its own correlation when it
-restarts the firmware. The entry is taken after the clock switch returned, so
-a timestamp written in that short window is converted with the old factor.
-The watchdog's periodic refresh keeps one entry from covering
+restarts the firmware. pm_runtime_get_if_active() also refuses while a
+runtime resume is still in progress: a resume that took clk_lock first has
+booted the firmware with the previous rate, and the governor then switches
+the clock before the GPU counts as active. Such a change is marked, and the
+first watchdog tick (every 500 ms) that finds the GPU in use passes it on with
+pvr_devfreq_sync_fw(); a GPU that goes idle first is powered off and boots
+with the rate from SYSINIT. The entry is taken after the clock switch
+returned, so a timestamp written in that short window is converted with the
+old factor. The watchdog's periodic refresh keeps one entry from covering
 more than a few seconds.
 
 clk_lock serialises the writers of the rate and the correlation: the
@@ -46,6 +52,8 @@ Lifetime. devfreq_add_device(), not the devm variant, so the governor is
 removed in pvr_device_fini() before the firmware structures it reads are
 freed. A failure to set up devfreq is reported and not fatal: the GPU keeps
 the rate its clock has, and the device tree has to make that a safe one.
+-EPROBE_DEFER from the supply is the exception and fails the probe, so the
+device probes again once the supply is there instead of running unscaled.
 
 Polling every 200 ms, the governor's own thresholds. The driver maps the runtime config the way it maps the other structures the host writes.
 
@@ -74,7 +82,7 @@ Assisted-by: Claude
  	pvr_drv.o \
 --- /dev/null
 +++ b/drivers/gpu/drm/imagination/pvr_devfreq.c
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,379 @@
 +// SPDX-License-Identifier: GPL-2.0-only OR MIT
 +
 +#include "pvr_devfreq.h"
@@ -253,8 +261,16 @@ Assisted-by: Claude
 +
 +	pvr_fw_set_core_clock_speed(pvr_dev, rate);
 +
-+	if (pm_runtime_get_if_active(dev) <= 0)
++	/*
++	 * Also 0 while a runtime resume is still in progress. A resume that took
++	 * &pvr_device.clk_lock before us has booted the firmware with the
++	 * previous rate, so leave the change to pvr_devfreq_sync_fw().
++	 */
++	if (pm_runtime_get_if_active(dev) <= 0) {
++		if (changed)
++			WRITE_ONCE(pvr_dev->devfreq.fw_stale, true);
 +		return;
++	}
 +
 +	if (!down_read_trylock(&pvr_dev->reset_sem))
 +		goto out_put;
@@ -269,6 +285,7 @@ Assisted-by: Claude
 +		if (err)
 +			dev_warn_ratelimited(dev, "core clock change not sent to FW (%d)\n",
 +					     err);
++		WRITE_ONCE(pvr_dev->devfreq.fw_stale, false);
 +	}
 +
 +out_up_read:
@@ -408,6 +425,25 @@ Assisted-by: Claude
 +}
 +
 +/**
++ * pvr_devfreq_sync_fw() - Tell the running firmware a rate it missed
++ * @pvr_dev: Target PowerVR device.
++ *
++ * Passes on a rate change that pvr_devfreq_update_fw() could not, because the
++ * GPU was still resuming. The firmware must run and the GPU must be powered.
++ */
++void
++pvr_devfreq_sync_fw(struct pvr_device *pvr_dev)
++{
++	if (!READ_ONCE(pvr_dev->devfreq.fw_stale))
++		return;
++
++	mutex_lock(&pvr_dev->clk_lock);
++	if (pvr_dev->devfreq.fw_stale)
++		pvr_devfreq_update_fw(pvr_dev, true);
++	mutex_unlock(&pvr_dev->clk_lock);
++}
++
++/**
 + * pvr_devfreq_fini() - Stop scaling the core clock
 + * @pvr_dev: Target PowerVR device.
 + *
@@ -428,7 +464,7 @@ Assisted-by: Claude
 +}
 --- /dev/null
 +++ b/drivers/gpu/drm/imagination/pvr_devfreq.h
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,51 @@
 +/* SPDX-License-Identifier: GPL-2.0-only OR MIT */
 +
 +#ifndef PVR_DEVFREQ_H
@@ -467,10 +503,17 @@ Assisted-by: Claude
 +
 +	/** @rebase: The previous sample is no baseline; the next one only becomes one. */
 +	bool rebase;
++
++	/**
++	 * @fw_stale: The running firmware has not been told the current rate;
++	 *            pvr_devfreq_sync_fw() tells it.
++	 */
++	bool fw_stale;
 +};
 +
 +int pvr_devfreq_init(struct pvr_device *pvr_dev);
 +void pvr_devfreq_fini(struct pvr_device *pvr_dev);
++void pvr_devfreq_sync_fw(struct pvr_device *pvr_dev);
 +
 +#endif /* PVR_DEVFREQ_H */
 --- a/drivers/gpu/drm/imagination/pvr_device.c
@@ -494,24 +537,36 @@ Assisted-by: Claude
  	/* Enable and initialize clocks required for the device to operate. */
  	err = pvr_device_clk_init(pvr_dev);
  	if (err)
-@@ -796,6 +801,16 @@
+@@ -796,10 +801,28 @@
  	if (err)
  		goto err_device_gpu_fini;
  
 +	/*
 +	 * Not fatal: without it the GPU keeps running at the rate its clock was
-+	 * left at, which the device tree has to make a safe one.
++	 * left at, which the device tree has to make a safe one. A supply or
++	 * cell that is not there yet is a reason to probe again, though.
 +	 */
 +	err = pvr_devfreq_init(pvr_dev);
 +	if (err) {
-+		drm_warn(drm_dev, "core clock scaling disabled (%d)\n", err);
 +		pvr_devfreq_fini(pvr_dev);
++		if (err == -EPROBE_DEFER) {
++			dev_err_probe(dev, err, "core clock scaling\n");
++			goto err_device_irq_fini;
++		}
++		drm_warn(drm_dev, "core clock scaling disabled (%d)\n", err);
 +	}
 +
  	pm_runtime_put(dev);
  
  	return 0;
-@@ -820,6 +835,7 @@
+ 
++err_device_irq_fini:
++	pvr_device_irq_fini(pvr_dev);
++
+ err_device_gpu_fini:
+ 	pvr_device_gpu_fini(pvr_dev);
+ 
+@@ -820,6 +843,7 @@
  	 * Deinitialization stages are performed in reverse order compared to
  	 * the initialization stages in pvr_device_init().
  	 */
@@ -529,10 +584,11 @@ Assisted-by: Claude
  #include "pvr_device_info.h"
  #include "pvr_fw.h"
  #include "pvr_rogue_fwif_stream.h"
-@@ -133,6 +134,16 @@
+@@ -132,6 +133,16 @@
+ 	 */
  	struct clk *core_clk;
  
- 	/**
++	/**
 +	 * @clk_lock: Serialises changes of the core clock rate with what the
 +	 *            firmware is told about it: the rate fields it reads at boot
 +	 *            and the timer correlation it timestamps with.
@@ -542,10 +598,9 @@ Assisted-by: Claude
 +	/** @devfreq: Core clock scaling state. */
 +	struct pvr_devfreq devfreq;
 +
-+	/**
+ 	/**
  	 * @sys_clk: Optional system bus clock.
  	 *
- 	 * This may be used on some platforms to provide an independent clock to the SoC Interface
 --- a/drivers/gpu/drm/imagination/pvr_fw.c
 +++ b/drivers/gpu/drm/imagination/pvr_fw.c
 @@ -520,11 +520,14 @@
@@ -585,10 +640,11 @@ Assisted-by: Claude
  	pvr_fw_object_unmap_and_destroy(fw_mem->gpu_util_fwcb_obj);
  	pvr_fw_object_destroy(fw_mem->fault_page_obj);
  	pvr_fw_object_unmap_and_destroy(fw_mem->sysdata_obj);
-@@ -1131,6 +1134,65 @@
+@@ -1130,6 +1133,65 @@
+ 	mutex_unlock(&fw_dev->time_corr.lock);
  }
  
- /**
++/**
 + * pvr_fw_time_corr_rate_changed() - Publish an entry for a new core clock rate
 + * @pvr_dev: Target PowerVR device.
 + *
@@ -647,10 +703,9 @@ Assisted-by: Claude
 +	wmb();
 +}
 +
-+/**
+ /**
   * pvr_fw_init() - Initialise and boot firmware
   * @pvr_dev: Target PowerVR device
-  *
 --- a/drivers/gpu/drm/imagination/pvr_fw.h
 +++ b/drivers/gpu/drm/imagination/pvr_fw.h
 @@ -367,6 +367,9 @@
@@ -689,7 +744,7 @@ Assisted-by: Claude
  
  	err = pvr_wait_for_fw_boot(pvr_dev);
  	if (err) {
-@@ -165,17 +169,20 @@
+@@ -165,17 +169,22 @@
  		 * gates the clocks right after this returns.
  		 */
  		pvr_fw_stop_force(pvr_dev);
@@ -698,6 +753,8 @@ Assisted-by: Claude
  	}
  
  	pvr_fw_time_corr_start(pvr_dev);
++	/* The firmware has just booted with the current rate. */
++	WRITE_ONCE(pvr_dev->devfreq.fw_stale, false);
 +	mutex_unlock(&pvr_dev->clk_lock);
  
  	queue_delayed_work(pvr_dev->sched_wq, &pvr_dev->watchdog.work,
@@ -711,4 +768,12 @@ Assisted-by: Claude
 +
  	if (rpm_resume)
  		disable_irq(pvr_dev->irq);
+ 
+@@ -261,6 +270,7 @@
+ 		goto out_pm_runtime_put;
+ 
+ 	pvr_fw_time_corr_refresh(pvr_dev);
++	pvr_devfreq_sync_fw(pvr_dev);
+ 
+ 	stalled = pvr_watchdog_kccb_stalled(pvr_dev);
  

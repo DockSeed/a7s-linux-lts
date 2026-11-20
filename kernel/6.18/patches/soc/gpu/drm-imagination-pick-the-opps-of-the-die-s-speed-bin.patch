@@ -12,7 +12,9 @@ tables.
 Without the cell nothing changes. A bin that does not fit a 32-bit mask is
 taken as bin 0, so a device tree that gives bin 0 safe rows covers it. A cell
 that is present but cannot be read fails devfreq setup, which leaves the GPU
-at the rate its clock has; guessing a bin would risk an under-volt.
+at the rate its clock has; guessing a bin would risk an under-volt. A cell
+whose provider has not probed yet (-EPROBE_DEFER) defers the GPU's probe,
+as a missing supply does.
 
 Assisted-by: Claude
 ---
@@ -32,7 +34,7 @@ Assisted-by: Claude
  #include <linux/of.h>
  #include <linux/pm_opp.h>
  #include <linux/pm_runtime.h>
-@@ -235,6 +237,44 @@
+@@ -244,6 +246,44 @@
  	return err;
  }
  
@@ -77,7 +79,7 @@ Assisted-by: Claude
  static int
  pvr_devfreq_opp_init(struct pvr_device *pvr_dev)
  {
-@@ -244,11 +284,20 @@
+@@ -253,11 +293,20 @@
  	struct dev_pm_opp_config config = {
  		.clk_names = clk_names,
  	};
