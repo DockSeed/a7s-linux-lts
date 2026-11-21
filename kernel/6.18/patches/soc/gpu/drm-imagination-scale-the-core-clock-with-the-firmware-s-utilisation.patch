@@ -37,9 +37,9 @@ restarts the firmware. A firmware can still have booted with the previous
 rate: a runtime resume that took clk_lock first (pm_runtime_get_if_active()
 refuses until it is done), or a reset that restarted the firmware and still
 holds reset_sem. A change is therefore marked until the firmware is told, and
-the first watchdog tick (every 500 ms) that finds the GPU in use passes it on with
-pvr_devfreq_sync_fw(); a GPU that goes idle first is powered off and boots
-with the rate from SYSINIT. The entry is taken after the clock switch
+the first watchdog tick (every 500 ms) that finds the GPU in use passes it on
+with pvr_devfreq_sync_fw(); a GPU that goes idle first is powered off and
+boots with the rate from SYSINIT. The entry is taken after the clock switch
 returned, so a timestamp written in that short window is converted with the
 old factor. The watchdog's periodic refresh keeps one entry from covering
 more than a few seconds.
@@ -56,9 +56,13 @@ the rate its clock has, and the device tree has to make that a safe one.
 device probes again once the supply is there instead of running unscaled.
 
 Polling every 200 ms. simple_ondemand gets an upthreshold of 45 and a
-downdifferential of 5, as panfrost and panthor use, instead of its 90 and 5: a
-submitting process that waits for each job keeps the GPU about 88 % busy at
-the lowest rate, which the default band of 85 to 90 holds there. The driver maps the runtime config the way it maps the other structures the host writes.
+downdifferential of 5, as panfrost and panthor use, instead of its 90 and 5:
+a process that submits a job and waits for it keeps the GPU busy enough at
+the lowest rate to stay inside the default band of 85 to 90, so the rate
+never rises.
+
+The driver maps the runtime config the way it maps the other structures the
+host writes.
 
 Assisted-by: Claude
 ---
@@ -115,7 +119,7 @@ Assisted-by: Claude
 + * load and keeps the rate down to PVR_DEVFREQ_UPTHRESHOLD -
 + * PVR_DEVFREQ_DOWNDIFFERENTIAL %. With its defaults (90, 5) a process that
 + * submits a job and waits for it stays at the lowest rate: the CPU part of
-+ * each round keeps the load near 88 %.
++ * each round keeps the load inside the band from 85 to 90 %.
 + */
 +#define PVR_DEVFREQ_UPTHRESHOLD 45
 +#define PVR_DEVFREQ_DOWNDIFFERENTIAL 5
@@ -276,8 +280,8 @@ Assisted-by: Claude
 +	 * A firmware that booted before the change still has the previous rate:
 +	 * one whose runtime resume took &pvr_device.clk_lock before us (the GPU
 +	 * is not active yet), or one that a reset restarted and still holds
-+	 * reset_sem for. Mark the change until the firmware is told, so that
-+	 * pvr_devfreq_sync_fw() passes it on if we cannot.
++	 * reset_sem for. Flag the change until the firmware has been told, so
++	 * that pvr_devfreq_sync_fw() passes it on if we cannot.
 +	 */
 +	if (changed)
 +		WRITE_ONCE(pvr_dev->devfreq.fw_stale, true);
