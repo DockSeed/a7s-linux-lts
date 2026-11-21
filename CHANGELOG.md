@@ -15,6 +15,14 @@ may be short).
 
 ## [Unreleased]
 
+### Changed
+
+- GPU: the clock rises with less load. simple_ondemand now goes to the highest
+  rate above 45 % load (was 90 %) and keeps the rate down to 40 % (was 85 %),
+  the values panfrost and panthor use. A program that submits a job and waits
+  for it kept the GPU about 88 % busy and so stayed at 400 MHz: a 3 MB texture
+  upload took 15.7 ms instead of 6.6 ms at 1008 MHz.
+
 ### Fixed
 
 - GPU: a clock change made while the GPU was still resuming, or while a reset

@@ -55,7 +55,10 @@ the rate its clock has, and the device tree has to make that a safe one.
 -EPROBE_DEFER from the supply is the exception and fails the probe, so the
 device probes again once the supply is there instead of running unscaled.
 
-Polling every 200 ms, the governor's own thresholds. The driver maps the runtime config the way it maps the other structures the host writes.
+Polling every 200 ms. simple_ondemand gets an upthreshold of 45 and a
+downdifferential of 5, as panfrost and panthor use, instead of its 90 and 5: a
+submitting process that waits for each job keeps the GPU about 88 % busy at
+the lowest rate, which the default band of 85 to 90 holds there. The driver maps the runtime config the way it maps the other structures the host writes.
 
 Assisted-by: Claude
 ---
@@ -82,7 +85,7 @@ Assisted-by: Claude
  	pvr_drv.o \
 --- /dev/null
 +++ b/drivers/gpu/drm/imagination/pvr_devfreq.c
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,394 @@
 +// SPDX-License-Identifier: GPL-2.0-only OR MIT
 +
 +#include "pvr_devfreq.h"
@@ -104,10 +107,18 @@ Assisted-by: Claude
 +#include <linux/pm_runtime.h>
 +#include <linux/rwsem.h>
 +
-+/*
-+ * Sampling period of the governor: its own thresholds are tuned for it.
-+ */
++/* Sampling period of the governor. */
 +#define PVR_DEVFREQ_POLL_MS 200
++
++/*
++ * simple_ondemand goes to the highest rate above PVR_DEVFREQ_UPTHRESHOLD %
++ * load and keeps the rate down to PVR_DEVFREQ_UPTHRESHOLD -
++ * PVR_DEVFREQ_DOWNDIFFERENTIAL %. With its defaults (90, 5) a process that
++ * submits a job and waits for it stays at the lowest rate: the CPU part of
++ * each round keeps the load near 88 %.
++ */
++#define PVR_DEVFREQ_UPTHRESHOLD 45
++#define PVR_DEVFREQ_DOWNDIFFERENTIAL 5
 +
 +/* Attempts at a consistent read of the firmware utilisation data. */
 +#define PVR_DEVFREQ_UTIL_READ_TRIES 3
@@ -410,7 +421,11 @@ Assisted-by: Claude
 +	pdf->profile.get_dev_status = pvr_devfreq_get_dev_status;
 +	pdf->profile.get_cur_freq = pvr_devfreq_get_cur_freq;
 +
-+	devfreq = devfreq_add_device(dev, &pdf->profile, DEVFREQ_GOV_SIMPLE_ONDEMAND, NULL);
++	pdf->gov_data.upthreshold = PVR_DEVFREQ_UPTHRESHOLD;
++	pdf->gov_data.downdifferential = PVR_DEVFREQ_DOWNDIFFERENTIAL;
++
++	devfreq = devfreq_add_device(dev, &pdf->profile, DEVFREQ_GOV_SIMPLE_ONDEMAND,
++				     &pdf->gov_data);
 +	if (IS_ERR(devfreq))
 +		return PTR_ERR(devfreq);
 +
@@ -467,7 +482,7 @@ Assisted-by: Claude
 +}
 --- /dev/null
 +++ b/drivers/gpu/drm/imagination/pvr_devfreq.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +/* SPDX-License-Identifier: GPL-2.0-only OR MIT */
 +
 +#ifndef PVR_DEVFREQ_H
@@ -491,6 +506,9 @@ Assisted-by: Claude
 +
 +	/** @profile: devfreq profile of this device. */
 +	struct devfreq_dev_profile profile;
++
++	/** @gov_data: Thresholds of the simple_ondemand governor. */
++	struct devfreq_simple_ondemand_data gov_data;
 +
 +	/** @cur_freq: Core clock rate of the current OPP, in Hz. */
 +	unsigned long cur_freq;
