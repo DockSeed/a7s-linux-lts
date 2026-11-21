@@ -13,7 +13,11 @@ each new kernel version. Pushing such a tag builds it; the text of the draft
 release on GitHub is the section below with the same version (for a test tag it
 may be short).
 
-## [Unreleased]
+## [6.18.64-R3] - 2026-11-21
+
+The recipe of 6.18.64-R2 with a GPU clock that rises at lower load and two
+fixes for GPU clock changes during resume and reset.
+`sudo a7s-kernel-update` on a board with an earlier release installs this one.
 
 ### Changed
 
@@ -27,9 +31,9 @@ may be short).
 
 - GPU: a clock change made while the GPU was still resuming, or while a reset
   that had just restarted the firmware still held it, did not reach the
-  firmware, which kept converting job timestamps with the old rate until the
-  next refresh and kept the old rate until the next change; the watchdog now
-  passes such a change on.
+  firmware. The firmware kept converting job timestamps with the old rate until
+  the next refresh, and kept the old rate until the next change. The watchdog
+  now passes such a change on.
 
 ### Known limits
 
@@ -37,6 +41,8 @@ may be short).
   can take them all, and the others get `-ENOSPC`.
 - GPU: a GPU supply or speed-bin cell that is not ready yet (`-EPROBE_DEFER`)
   defers the GPU's probe instead of leaving it at a fixed clock.
+- Suspend to idle for 20 s resets the board; 8 s resumes fine. The limit in
+  between is not measured. Not checked with earlier releases.
 
 ## [6.18.64-R2] - 2026-11-19
 
