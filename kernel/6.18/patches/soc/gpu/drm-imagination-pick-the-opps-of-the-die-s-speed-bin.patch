@@ -34,7 +34,7 @@ Assisted-by: Claude
  #include <linux/of.h>
  #include <linux/pm_opp.h>
  #include <linux/pm_runtime.h>
-@@ -246,6 +248,44 @@
+@@ -254,6 +256,44 @@
  	return err;
  }
  
@@ -79,7 +79,7 @@ Assisted-by: Claude
  static int
  pvr_devfreq_opp_init(struct pvr_device *pvr_dev)
  {
-@@ -255,11 +295,20 @@
+@@ -263,11 +303,20 @@
  	struct dev_pm_opp_config config = {
  		.clk_names = clk_names,
  	};
