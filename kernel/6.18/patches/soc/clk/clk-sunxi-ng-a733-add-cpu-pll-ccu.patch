@@ -422,7 +422,7 @@ Assisted-by: Claude
 +/*
 + * Allwinner A733 (sun60iw2) CPU PLL clock control unit, CPU_PLL_CFG @0x08870000.
 + *
-+ * Copyright (c) 2026 DockSeed A733 Debian mainline track
++ * Copyright (c) 2026 DockSeed
 + *
 + * The block holds four PLLs and three CPU clock muxes:
 + *
@@ -1148,10 +1148,7 @@ Assisted-by: Claude
 +MODULE_LICENSE("GPL");
 --- a/drivers/clk/sunxi-ng/Kconfig
 +++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -64,12 +64,17 @@
- 
- config SUN60I_A733_RTC_CCU
- 	tristate "Support for the Allwinner A733 RTC CCU"
+@@ -67,6 +67,11 @@
  	default ARCH_SUNXI
  	depends on ARM64 || COMPILE_TEST
  
@@ -1163,9 +1160,6 @@ Assisted-by: Claude
  config SUN55I_A523_CCU
  	tristate "Support for the Allwinner A523/T527 CCU"
  	default ARCH_SUNXI
- 	depends on ARM64 || COMPILE_TEST
- 
- config SUN55I_A523_MCU_CCU
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
 @@ -36,6 +36,7 @@

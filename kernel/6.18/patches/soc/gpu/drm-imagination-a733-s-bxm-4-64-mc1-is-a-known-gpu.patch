@@ -27,14 +27,15 @@ Why "supported" and not "experimental"
 
 Two reasons, and the second is the operative one.
 
-(1) Our firmware was compared byte for byte against 36.52.104.182, which
-upstream promoted to supported in e55fead22ff9. Both files were parsed and laid
-side by side: identical feature mask, identical 29 parameter values, identical
-ERN set, identical FW build. The device info differs in one bit -- .182 carries
-BRN 71242, we do not -- and cmp finds 5 differing bytes in the whole 128 KiB.
-BRN 71242 is used once in the driver and is additionally gated on
-!gpu_multicore_support, a feature our firmware sets. There is no behavioural
-difference to a core upstream already calls supported.
+(1) What the mainline driver reads from the firmware header in
+pvr_fw_get_device_info() -- the feature mask, the parameter array and the ERN
+and BRN bitmasks -- agrees between 36.56.104.183 and 36.52.104.182, which
+upstream promoted to supported in e55fead22ff9, except for one BRN bit:
+identical feature mask, identical 29 parameter values, identical ERN set;
+.182 carries BRN 71242, we do not. BRN 71242 is used once in the driver and
+is additionally gated on !gpu_multicore_support, a feature our firmware sets.
+There is no behavioural difference to a core upstream already calls
+supported.
 
 (2) PVR_GPU_EXPERIMENTAL would change nothing operationally: read
 pvr_check_gpu_supported() and it returns -ENODEV for EXPERIMENTAL without

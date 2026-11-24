@@ -13,6 +13,37 @@ each new kernel version. Pushing such a tag builds it; the text of the draft
 release on GitHub is the section below with the same version (for a test tag it
 may be short).
 
+## [6.18.65-R2] - 2026-11-24
+
+The recipe of 6.18.65-R1 with corrected copyright and licence notices; the
+kernel itself does not change.
+`sudo a7s-kernel-update` on a board with an earlier release installs this one.
+
+### Changed
+
+- Copyright: the files added by the A733 clk, pinctrl and pwm patches say
+  `Copyright (c) 2026 DockSeed`, like the others. The thermal patch quotes the
+  copyright lines of the Allwinner driver that `sun60i_a733_ths_calibrate()` is
+  derived from. The Maxio PHY driver has a comment saying that its SPDX line is
+  ours, read from `MODULE_LICENSE("GPL")`; the patch text no longer calls the
+  driver a module (it is built in). Comments and patch text only: device tree and
+  modules are the same as in 6.18.65-R1, and `Image` differs only in its
+  build-id.
+- The text of the GPU allowlist patch names what the driver reads from the
+  firmware header and nothing else.
+- `linux-image` and `linux-headers` carry a copyright file in the Debian
+  machine-readable format that names the kernel tarball and the tag of this
+  repository as the source. `a7s-kernel-hook` has a copyright file now.
+- `a7s-aic8800-dkms`: the copyright file has its own entry for the ISC-licensed
+  radar code (`rwnx_radar.c`, `rwnx_radar.h`), adapted from the ath driver of
+  the kernel.
+- README: the sentence on who the project is not affiliated with names
+  Imagination Technologies.
+
+### Known limits
+
+- As in 6.18.65-R1.
+
 ## [6.18.65-R1] - 2026-11-24
 
 The recipe of 6.18.64-R3 on Linux 6.18.65.

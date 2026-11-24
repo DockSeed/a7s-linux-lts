@@ -22,14 +22,15 @@ Changes against that patch for Linux 6.18:
 - config_init sets LED1 to show link at 1000/100/10 Mbit/s and activity;
   the power-on default lights it only on a 100 Mbit/s link.
 - SPDX line added (derived from the original's MODULE_LICENSE("GPL"),
-  which is the only licence statement in it), maxio_mae0621a_suspend()
+  which is the only licence statement in it; a comment above
+  MODULE_LICENSE() says so), maxio_mae0621a_suspend()
   made static, Kconfig and Makefile lines indented with tabs.
 - left out: the phy_device.c PHY ID read quirk (meant for several PHYs
   on one MDIO bus, compiled only with CONFIG_MAXIO_PHY=y) and the
   stmmac_main.c resume hook (its 6.14 hunk does not apply to 6.18).
 
-Built as a module (CONFIG_MAXIO_PHY=m); if it does not bind, the PHY
-falls back to Generic PHY.
+Built in (CONFIG_MAXIO_PHY=y in kernel/6.18/config); if it does not bind,
+the PHY falls back to Generic PHY.
 
 Link: https://github.com/armbian/build/commit/485a6d62cc3b44a754ede5ad7c562dfdfe0c95a2
 Assisted-by: Claude
@@ -64,10 +65,10 @@ index 76e0db4..1a08842 100644
  obj-$(CONFIG_SMSC_PHY)		+= smsc.o
 diff --git a/drivers/net/phy/maxio.c b/drivers/net/phy/maxio.c
 new file mode 100644
-index 0000000..129aef8
+index 0000000..79c9699
 --- /dev/null
 +++ b/drivers/net/phy/maxio.c
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,248 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * drivers/net/phy/maxio.c
@@ -314,4 +315,5 @@ index 0000000..129aef8
 +
 +MODULE_DESCRIPTION("Maxio PHY driver");
 +MODULE_AUTHOR("Zhao Yang");
++/* The SPDX line at the top is ours, read from this MODULE_LICENSE(); the original has none. */
 +MODULE_LICENSE("GPL");

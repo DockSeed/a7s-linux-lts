@@ -94,8 +94,8 @@ diff -uNr a/drivers/thermal/sun8i_thermal.c b/drivers/thermal/sun8i_thermal.c
 + * reads cooler, which is the sign this formula produces.
 + *
 + * Derived from the vendor's sun60iw2_ths_calibrate() (radxa/allwinner-bsp,
-+ * drivers/thermal/sunxi_thermal.c), which a vendor kernel's live CDATA
-+ * reproduces 5 of 5.  Differences to the vendor function:
++ * drivers/thermal/sunxi_thermal.c, copyright at the end of this file), which
++ * a vendor kernel's live CDATA reproduces 5 of 5.  Differences to it:
 + *  - it reads the SID through a private vendor API; this takes an nvmem
 + *    cell like every other sun8i chip;
 + *  - on a zero ft_temp it returns success, and a blank sensor field (raw 0)
@@ -196,3 +196,16 @@ diff -uNr a/drivers/thermal/sun8i_thermal.c b/drivers/thermal/sun8i_thermal.c
  	.init = sun60i_a733_thermal_init,
  	.irq_ack = sun50i_h6_irq_ack,
  	.calc_temp = sun60i_a733_calc_temp,
+@@ -969,5 +1055,12 @@
+ };
+ module_platform_driver(ths_driver);
+ 
++/*
++ * sun60i_a733_ths_calibrate() is derived from the vendor driver
++ * (radxa/allwinner-bsp, drivers/thermal/sunxi_thermal.c), which states:
++ *	Copyright(c) 2020 - 2023 Allwinner Technology Co.,Ltd. All rights reserved.
++ *	Copyright (C) 2019 frank@allwinnertech.com
++ */
++
+ MODULE_DESCRIPTION("Thermal sensor driver for Allwinner SOC");
+ MODULE_LICENSE("GPL v2");

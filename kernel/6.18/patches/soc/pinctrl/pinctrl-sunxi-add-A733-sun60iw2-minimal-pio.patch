@@ -63,7 +63,7 @@ index 951b3f1e4..bab447334 100644
  obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
 diff --git a/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
 new file mode 100644
-index 000000000..fe357b357
+index 000000000..9841233ea
 --- /dev/null
 +++ b/drivers/pinctrl/sunxi/pinctrl-sun60iw2.c
 @@ -0,0 +1,77 @@
@@ -78,7 +78,7 @@ index 000000000..fe357b357
 + * from the running vendor board (all banks contiguous, count == max offset + 1).
 + *
 + * Based on drivers/pinctrl/sunxi/pinctrl-sun55i-a523.c, Copyright (C) 2023 Arm Ltd.
-+ * Copyright (c) 2026 DockSeed A733 Debian mainline track
++ * Copyright (c) 2026 DockSeed
 + */
 +
 +#include <linux/module.h>

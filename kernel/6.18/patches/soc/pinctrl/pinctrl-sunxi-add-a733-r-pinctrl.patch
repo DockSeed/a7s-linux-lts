@@ -69,7 +69,7 @@ Assisted-by: Claude
 + * as the boot chain set it.
 + *
 + * Based on drivers/pinctrl/sunxi/pinctrl-sun55i-a523-r.c, Copyright (C) 2024 Arm Ltd.
-+ * Copyright (c) 2026 DockSeed A733 Debian mainline track
++ * Copyright (c) 2026 DockSeed
 + */
 +
 +#include <linux/module.h>

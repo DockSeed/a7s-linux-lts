@@ -159,4 +159,4 @@ The repository as a whole can be shared under GPL-2.0 ([LICENSE](LICENSE)).
 Full texts in [LICENSES/](LICENSES/), assignments in [REUSE.toml](REUSE.toml);
 `reuse lint` checks them.
 
-Unofficial; not affiliated with or authorized by Radxa, Allwinner or AICSemi.
+Unofficial; not affiliated with or authorized by Radxa, Allwinner, Imagination Technologies or AICSemi.

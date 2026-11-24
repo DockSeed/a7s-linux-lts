@@ -95,7 +95,7 @@ Assisted-by: Claude
 +/*
 + * Allwinner A733 (sun60iw2) PWM controller driver.
 + *
-+ * Copyright (c) 2026 DockSeed A733 Debian mainline track
++ * Copyright (c) 2026 DockSeed
 + *
 + * The part has three of these blocks -- PWM0 @ 0x02527000, PWM1 @ 0x02528000
 + * and S_PWM @ 0x07023000, ten channels each (A733 UM V0.92 18.7.7).

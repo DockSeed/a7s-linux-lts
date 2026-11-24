@@ -88,7 +88,7 @@ Assisted-by: Claude
 + * in later patches.
 + *
 + * Based on drivers/clk/sunxi-ng/ccu-sun55i-a523.c, Copyright (C) 2023 Arm Ltd.
-+ * Copyright (c) 2026 DockSeed A733 Debian mainline track
++ * Copyright (c) 2026 DockSeed
 + */
 +
 +#include <linux/clk-provider.h>

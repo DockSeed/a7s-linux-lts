@@ -64,6 +64,47 @@ stage_hook() {
   done
   for f in "${t}"/etc/kernel/*/* "${t}"/usr/share/kernel/*/* "${t}"/usr/sbin/*; do sh -n "${f}" || die "hook: ${f##*/} has a syntax error"; done
 
+  install -d -m0755 "${t}/usr/share/doc/${HOOK_PACKAGE}"
+  cat > "${t}/usr/share/doc/${HOOK_PACKAGE}/copyright" <<'COPYRIGHT'
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: a7s-linux-lts
+Source: https://github.com/DockSeed/a7s-linux-lts
+
+Files: *
+Copyright: 2026 the a7s-linux-lts contributors
+License: GPL-2 or Expat
+Comment: Every file of this package is under the GPL, version 2 only, or
+ the MIT licence, at your choice (the SPDX expression in each file).
+
+License: GPL-2
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.
+
+License: Expat
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the "Software"),
+ to deal in the Software without restriction, including without limitation
+ the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to whom the
+ Software is furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ IN THE SOFTWARE.
+COPYRIGHT
+  chmod 0644 "${t}/usr/share/doc/${HOOK_PACKAGE}/copyright"
+
   install -d -m0755 "${t}/DEBIAN"
   ( cd "${t}" && find etc -type f | LC_ALL=C sort | sed 's|^|/|' ) > "${t}/DEBIAN/conffiles"
   chmod 0644 "${t}/DEBIAN/conffiles"

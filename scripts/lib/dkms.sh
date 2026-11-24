@@ -70,6 +70,17 @@ License: GPL-2
 Comment: Radxa's debian/copyright states GPL-2 for src/; both modules
  declare MODULE_LICENSE("GPL").
 
+Files: aic8800_fdrv/rwnx_radar.c
+ aic8800_fdrv/rwnx_radar.h
+Copyright: 2012 Neratec Solutions AG
+ 2012-2019 RivieraWaves
+License: ISC
+Comment: rwnx_radar.c states that it is copied and adapted from the ath driver
+ of the Linux kernel (drivers/net/wireless/ath/dfs_pri_detector.c, ISC);
+ struct pri_sequence in rwnx_radar.h has the members and the comment of the
+ one in dfs_pri_detector.h. The files themselves carry no licence notice;
+ RivieraWaves' changes fall under the GPL-2 of the package.
+
 Files: aic8800_fdrv/aic_br_ext.*
 Copyright: 2019-2021 Aicsemi Corporation
 License: Apache-2.0
@@ -80,6 +91,19 @@ License: GPL-2
 
 License: Apache-2.0
  On Debian systems, see /usr/share/common-licenses/Apache-2.0.
+
+License: ISC
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 EOF
   {
     echo "Source:  ${AIC8800_URL} ${AIC8800_TAG} (${AIC8800_COMMIT}), ${AIC8800_SUBDIR}"
