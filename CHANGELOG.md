@@ -13,6 +13,40 @@ each new kernel version. Pushing such a tag builds it; the text of the draft
 release on GitHub is the section below with the same version (for a test tag it
 may be short).
 
+## [6.18.65-R1] - 2026-11-24
+
+The recipe of 6.18.64-R3 on Linux 6.18.65.
+`sudo a7s-kernel-update` on a board with an earlier release installs this one.
+
+### Changed
+
+- Linux 6.18.65 (longterm) as the base, up from 6.18.64, with the fixes of that
+  stable release
+  ([ChangeLog-6.18.65](https://cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.18.65)).
+- 6.18.65 carries none of the CVE fixes and none of the backports in
+  `kernel/6.18/patches/backport/`, so all stay.
+- Eleven patches regenerated against the new base, because stable changed the
+  surrounding lines: only hunk offsets differ, not the patched code. Backports
+  `dt-bindings-vendor-prefixes-add-hynetek` and
+  `net-stmmac-move-msi-data-out-of-struct-stmmac_priv`; our
+  `net-stmmac-retry-a-failed-rx-refill-from-a-timer`,
+  `bluetooth-btusb-request-the-reset-gpio-only-where-a-handler-uses-it` and
+  `dmaengine-sun6i-a733-per-channel-interrupts-and-pause-bit`; CVE fixes
+  `mm-fix-deferred-split-queue-races-during-migration`,
+  `net-bridge-vlan-fix-bugs-caused-by-switchdev-deletion-errors`,
+  `net-always-dissect-gso-packets-in-virtio-net-hdr-to-skb`,
+  `nvme-fix-command-effects-log-lifetime-for-multipath-heads`,
+  `btrfs-don-t-stash-io-uring-encoded-data-across-eagain` and
+  `cgroup-cpuset-don-t-access-cpuset-cgrp-subsys-root-in-is-in-v2-mode`.
+  The rest of the series applies unchanged at fuzz 0 without offsets.
+- `kernel/6.18/config` is written again in minimal form, as
+  `make savedefconfig` gives it: `PM_DEVFREQ` is left out because the GPU
+  driver selects it, `NETCONSOLE` moves. The built configuration is the same.
+
+### Known limits
+
+- As in 6.18.64-R3.
+
 ## [6.18.64-R3] - 2026-11-21
 
 The recipe of 6.18.64-R2 with a GPU clock that rises at lower load and two

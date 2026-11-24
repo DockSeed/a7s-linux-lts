@@ -1,10 +1,10 @@
-# Kernel: Linux 6.18.64
+# Kernel: Linux 6.18.65
 
 `kernel/6.18/` is the kernel input of this recipe (the AIC8800 driver is in
 `out-of-tree/aic8800/`):
 
-- `series`: 280 patch paths, applied in this order to the pristine
-  `linux-6.18.64.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
+- `series`: 290 patch paths, applied in this order to the pristine
+  `linux-6.18.65.tar.xz` from cdn.kernel.org (sha256 in `scripts/lib/kernel.sh`).
 - `patches/`: `backport/` (other people's patches, to drop once 6.18.y has
   them), `cve/` (fixes for CVEs that 6.18.y does not carry yet, see
   [CVE fixes](#cve-fixes)), `soc/<subsystem>/` (A733 support, any A733 board) and `board/dts/`
@@ -39,9 +39,9 @@ The command is part of the package `a7s-kernel-hook`, which the images of
 a7s-build carry.
 
 1. `sudo a7s-kernel-update` installs the latest release (GitHub's "latest"
-   leaves out drafts and pre-releases); `sudo a7s-kernel-update v6.18.64-R1`
+   leaves out drafts and pre-releases); `sudo a7s-kernel-update v6.18.65-R1`
    installs that release; a published test build is named the same way
-   (`v6.18.64-T1`, a pre-release, with a note that it is one). It downloads the packages
+   (`v6.18.65-T1`, a pre-release, with a note that it is one). It downloads the packages
    of the release to a temporary directory below `/var/cache/a7s-kernel-update`,
    checks their sha256 against the release's `SHA256SUMS` (a mismatch removes
    the files and stops), installs them with `apt-get` and removes the directory.
@@ -183,9 +183,10 @@ prints the command and does not fail.
 For the maintainer; the steps are those of [release.yml](../.github/workflows/release.yml).
 
 1. Make sure `KERNEL_VERSION` in `scripts/lib/kernel.sh` is the kernel version
-   to release, and rename the `[Unreleased]` section of `CHANGELOG.md` to
-   `## [<kernel version>-R<n>] - <date>`. The workflow stops before the build
-   when the tag does not name that version or the section is missing.
+   to release, and rename the `[Unreleased]` section of `CHANGELOG.md` (or add
+   a section) to `## [<kernel version>-R<n>] - <date>`. The workflow stops
+   before the build when the tag does not name that version or the section is
+   missing.
 2. `git tag v<kernel version>-R<n>` on that commit, `git push origin` the tag
    (a `-T<n>` tag makes a test build, a pre-release).
 3. The workflow builds the tag (`./build.sh all`, `deb`, `package`) and creates
@@ -274,7 +275,7 @@ lines of `pinctrl-sunxi-instrument-the-power-source-handler` (silent until
 as unfixed in the 6.18 stable release this recipe builds. Each is the mainline
 commit or, where that does not apply, the backport of another stable branch or
 the 6.18 stable queue; the header names the source, and `[ adapted: … ]` marks
-the ones whose context or code differs from it. They come last in `series`.
+the ones whose context or code differs from it.
 When a stable release brings one of them, it no longer applies (it applies in
 reverse) and the bump drops it.
 
@@ -290,7 +291,7 @@ one of these on makes its CVEs apply again. The state per release is in
 
 ## Checked
 
-Against the pristine tree in the builder container: all 280 patches apply at
+Against the pristine tree in the builder container: all 290 patches apply at
 fuzz 0 without offsets; `make a7s_defconfig && make savedefconfig` reproduces
 `config` (apart from its header comment); `make dtbs` and `make W=1` over the
 display, PHY, PCIe, CCU, pin controller and USB/Bluetooth code touched by the

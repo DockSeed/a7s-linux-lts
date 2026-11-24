@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# Kernel configuration for the Radxa Cubie A7S (Allwinner A733), Linux 6.18.64
+# Kernel configuration for the Radxa Cubie A7S (Allwinner A733), Linux 6.18.65
 # with kernel/6.18/series applied. This is a defconfig (minimal form): install
 # it as arch/arm64/configs/a7s_defconfig and run `make a7s_defconfig`.
 #
@@ -220,13 +220,13 @@ CONFIG_DM_MIRROR=m
 CONFIG_DM_RAID=m
 CONFIG_DM_ZERO=m
 CONFIG_NETDEVICES=y
-CONFIG_NETCONSOLE=m
 CONFIG_DUMMY=m
 CONFIG_WIREGUARD=m
 CONFIG_MACVLAN=m
 CONFIG_MACVTAP=m
 CONFIG_IPVLAN=m
 CONFIG_VXLAN=m
+CONFIG_NETCONSOLE=m
 CONFIG_TUN=y
 CONFIG_VETH=m
 CONFIG_STMMAC_ETH=y
@@ -376,7 +376,6 @@ CONFIG_STAGING_MEDIA=y
 CONFIG_COMMON_CLK_PWM=y
 CONFIG_HWSPINLOCK=y
 CONFIG_SUN60I_IOMMU=y
-CONFIG_PM_DEVFREQ=y
 CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
 CONFIG_DEVFREQ_GOV_PERFORMANCE=y
 CONFIG_DEVFREQ_GOV_USERSPACE=y

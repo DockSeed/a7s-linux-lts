@@ -23,7 +23,7 @@ Assisted-by: Claude
 ---
 --- a/drivers/bluetooth/btusb.c
 +++ b/drivers/bluetooth/btusb.c
-@@ -4162,13 +4162,20 @@ static int btusb_probe(struct usb_interface *intf,
+@@ -4164,13 +4164,20 @@ static int btusb_probe(struct usb_interface *intf,
  
  	SET_HCIDEV_DEV(hdev, &intf->dev);
  

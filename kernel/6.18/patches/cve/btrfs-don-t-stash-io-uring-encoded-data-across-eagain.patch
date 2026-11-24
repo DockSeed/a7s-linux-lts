@@ -28,7 +28,7 @@ Assisted-by: Claude
 diff --git a/fs/btrfs/ioctl.c b/fs/btrfs/ioctl.c
 --- a/fs/btrfs/ioctl.c
 +++ b/fs/btrfs/ioctl.c
-@@ -4897,7 +4897,7 @@ static int btrfs_uring_encoded_read(struct io_uring_cmd *cmd, unsigned int issue
+@@ -4908,7 +4908,7 @@ static int btrfs_uring_encoded_read(struct io_uring_cmd *cmd, unsigned int issue
  	ret = btrfs_encoded_read(&kiocb, &data->iter, &data->args, &cached_state,
  				 &disk_bytenr, &disk_io_size);
  	if (ret == -EAGAIN)
@@ -37,7 +37,7 @@ diff --git a/fs/btrfs/ioctl.c b/fs/btrfs/ioctl.c
  	if (ret < 0 && ret != -EIOCBQUEUED)
  		goto out_free;
  
-@@ -4939,8 +4939,10 @@ static int btrfs_uring_encoded_read(struct io_uring_cmd *cmd, unsigned int issue
+@@ -4950,8 +4950,10 @@ static int btrfs_uring_encoded_read(struct io_uring_cmd *cmd, unsigned int issue
  		add_rchar(current, ret);
  	inc_syscr(current);
  
@@ -49,7 +49,7 @@ diff --git a/fs/btrfs/ioctl.c b/fs/btrfs/ioctl.c
  
  	return ret;
  }
-@@ -4975,6 +4977,11 @@ static int btrfs_uring_encoded_write(struct io_uring_cmd *cmd, unsigned int issu
+@@ -4986,6 +4988,11 @@ static int btrfs_uring_encoded_write(struct io_uring_cmd *cmd, unsigned int issu
  		goto out_acct;
  	}
  
@@ -61,7 +61,7 @@ diff --git a/fs/btrfs/ioctl.c b/fs/btrfs/ioctl.c
  	if (!data) {
  		data = kzalloc(sizeof(*data), GFP_NOFS);
  		if (!data) {
-@@ -5043,11 +5050,6 @@ static int btrfs_uring_encoded_write(struct io_uring_cmd *cmd, unsigned int issu
+@@ -5054,11 +5061,6 @@ static int btrfs_uring_encoded_write(struct io_uring_cmd *cmd, unsigned int issu
  		}
  	}
  
@@ -73,7 +73,7 @@ diff --git a/fs/btrfs/ioctl.c b/fs/btrfs/ioctl.c
  	pos = data->args.offset;
  	ret = rw_verify_area(WRITE, file, &pos, data->args.len);
  	if (ret < 0)
-@@ -5073,8 +5075,8 @@ static int btrfs_uring_encoded_write(struct io_uring_cmd *cmd, unsigned int issu
+@@ -5084,8 +5086,8 @@ static int btrfs_uring_encoded_write(struct io_uring_cmd *cmd, unsigned int issu
  		add_wchar(current, ret);
  	inc_syscw(current);
  

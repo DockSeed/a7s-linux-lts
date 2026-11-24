@@ -25,7 +25,7 @@ Signed-off-by: Jakub Kicinski <kuba@kernel.org>
 diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
 --- a/net/bridge/br_vlan.c
 +++ b/net/bridge/br_vlan.c
-@@ -382,12 +382,12 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags,
+@@ -387,12 +387,12 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags,
  	goto out;
  }
  
@@ -40,7 +40,7 @@ diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
  
  	if (br_vlan_is_master(v)) {
  		vg = br_vlan_group(v->br);
-@@ -401,12 +401,16 @@ static int __vlan_del(struct net_bridge_vlan *v)
+@@ -406,12 +406,16 @@ static int __vlan_del(struct net_bridge_vlan *v)
  	if (p) {
  		err = __vlan_vid_del(p->dev, p->br, v);
  		if (err)
@@ -60,7 +60,7 @@ diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
  	}
  
  	if (br_vlan_should_use(v)) {
-@@ -426,8 +430,6 @@ static int __vlan_del(struct net_bridge_vlan *v)
+@@ -431,8 +435,6 @@ static int __vlan_del(struct net_bridge_vlan *v)
  	}
  
  	br_vlan_put_master(masterv);
@@ -69,7 +69,7 @@ diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
  }
  
  static void __vlan_group_free(struct net_bridge_vlan_group *vg)
-@@ -444,7 +446,6 @@ static void __vlan_flush(const struct net_bridge *br,
+@@ -449,7 +451,6 @@ static void __vlan_flush(const struct net_bridge *br,
  {
  	struct net_bridge_vlan *vlan, *tmp;
  	u16 v_start = 0, v_end = 0;
@@ -77,7 +77,7 @@ diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
  
  	__vlan_delete_pvid(vg, vg->pvid);
  	list_for_each_entry_safe(vlan, tmp, &vg->vlan_list, vlist) {
-@@ -458,13 +459,7 @@ static void __vlan_flush(const struct net_bridge *br,
+@@ -463,13 +464,7 @@ static void __vlan_flush(const struct net_bridge *br,
  		}
  		v_end = vlan->vid;
  
@@ -92,7 +92,7 @@ diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
  	}
  
  	/* notify about the last/whole vlan range */
-@@ -832,8 +827,9 @@ int br_vlan_delete(struct net_bridge *br, u16 vid)
+@@ -837,8 +832,9 @@ int br_vlan_delete(struct net_bridge *br, u16 vid)
  	br_fdb_delete_by_port(br, NULL, vid, 0);
  
  	vlan_tunnel_info_del(vg, v);
@@ -103,7 +103,7 @@ diff --git a/net/bridge/br_vlan.c b/net/bridge/br_vlan.c
  }
  
  void br_vlan_flush(struct net_bridge *br)
-@@ -1363,8 +1359,9 @@ int nbp_vlan_delete(struct net_bridge_port *port, u16 vid)
+@@ -1368,8 +1364,9 @@ int nbp_vlan_delete(struct net_bridge_port *port, u16 vid)
  		return -ENOENT;
  	br_fdb_find_delete_local(port->br, port, port->dev->dev_addr, vid);
  	br_fdb_delete_by_port(port->br, port, vid, 0);

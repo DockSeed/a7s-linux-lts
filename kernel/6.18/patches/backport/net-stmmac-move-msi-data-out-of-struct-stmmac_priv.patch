@@ -55,7 +55,7 @@ index 21b473c8d2a904..515fcf8afb8713 100644
  struct stmmac_priv {
  	/* Frequently used values are kept adjacent for cache effect */
  	u32 tx_coal_frames[MTL_MAX_TX_QUEUES];
-@@ -318,19 +335,7 @@ struct stmmac_priv {
+@@ -319,19 +336,7 @@ struct stmmac_priv {
  	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
  	unsigned int num_double_vlans;
  	int sfty_irq;
@@ -80,7 +80,7 @@ diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/eth
 index 63c045616c9b73..ff656900310bca 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -3558,6 +3558,7 @@ static void stmmac_free_irq(struct net_device *dev,
+@@ -3567,6 +3567,7 @@ static void stmmac_free_irq(struct net_device *dev,
  			    enum request_irq_err irq_err, int irq_idx)
  {
  	struct stmmac_priv *priv = netdev_priv(dev);
@@ -88,7 +88,7 @@ index 63c045616c9b73..ff656900310bca 100644
  	int j;
  
  	switch (irq_err) {
-@@ -3565,28 +3566,30 @@ static void stmmac_free_irq(struct net_device *dev,
+@@ -3574,28 +3575,30 @@ static void stmmac_free_irq(struct net_device *dev,
  		irq_idx = priv->plat->tx_queues_to_use;
  		fallthrough;
  	case REQ_IRQ_ERR_TX:
@@ -131,7 +131,7 @@ index 63c045616c9b73..ff656900310bca 100644
  		fallthrough;
  	case REQ_IRQ_ERR_SFTY_CE:
  		if (priv->wol_irq > 0 && priv->wol_irq != dev->irq)
-@@ -3606,9 +3609,30 @@ static void stmmac_free_irq(struct net_device *dev,
+@@ -3615,9 +3618,30 @@ static void stmmac_free_irq(struct net_device *dev,
  	}
  }
  
@@ -162,7 +162,7 @@ index 63c045616c9b73..ff656900310bca 100644
  	enum request_irq_err irq_err;
  	int irq_idx = 0;
  	char *int_name;
-@@ -3616,7 +3640,7 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3625,7 +3649,7 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	int i;
  
  	/* For common interrupt */
@@ -171,7 +171,7 @@ index 63c045616c9b73..ff656900310bca 100644
  	sprintf(int_name, "%s:%s", dev->name, "mac");
  	ret = request_irq(dev->irq, stmmac_mac_interrupt,
  			  0, int_name, dev);
-@@ -3632,7 +3656,7 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3641,7 +3665,7 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	 * is used for WoL
  	 */
  	if (priv->wol_irq > 0 && priv->wol_irq != dev->irq) {
@@ -180,7 +180,7 @@ index 63c045616c9b73..ff656900310bca 100644
  		sprintf(int_name, "%s:%s", dev->name, "wol");
  		ret = request_irq(priv->wol_irq,
  				  stmmac_mac_interrupt,
-@@ -3650,7 +3674,7 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3659,7 +3683,7 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	 * Error line in case of another line is used
  	 */
  	if (priv->sfty_irq > 0 && priv->sfty_irq != dev->irq) {
@@ -189,7 +189,7 @@ index 63c045616c9b73..ff656900310bca 100644
  		sprintf(int_name, "%s:%s", dev->name, "safety");
  		ret = request_irq(priv->sfty_irq, stmmac_safety_interrupt,
  				  0, int_name, dev);
-@@ -3666,16 +3690,16 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3675,16 +3699,16 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	/* Request the Safety Feature Correctible Error line in
  	 * case of another line is used
  	 */
@@ -210,7 +210,7 @@ index 63c045616c9b73..ff656900310bca 100644
  			irq_err = REQ_IRQ_ERR_SFTY_CE;
  			goto irq_error;
  		}
-@@ -3684,16 +3708,16 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3693,16 +3717,16 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	/* Request the Safety Feature Uncorrectible Error line in
  	 * case of another line is used
  	 */
@@ -231,7 +231,7 @@ index 63c045616c9b73..ff656900310bca 100644
  			irq_err = REQ_IRQ_ERR_SFTY_UE;
  			goto irq_error;
  		}
-@@ -3703,23 +3727,23 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3712,23 +3736,23 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	for (i = 0; i < priv->plat->rx_queues_to_use; i++) {
  		if (i >= MTL_MAX_RX_QUEUES)
  			break;
@@ -260,7 +260,7 @@ index 63c045616c9b73..ff656900310bca 100644
  				      cpumask_of(i % num_online_cpus()));
  	}
  
-@@ -3727,23 +3751,23 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
+@@ -3736,23 +3760,23 @@ static int stmmac_request_irq_multi_msi(struct net_device *dev)
  	for (i = 0; i < priv->plat->tx_queues_to_use; i++) {
  		if (i >= MTL_MAX_TX_QUEUES)
  			break;
@@ -289,7 +289,7 @@ index 63c045616c9b73..ff656900310bca 100644
  				      cpumask_of(i % num_online_cpus()));
  	}
  
-@@ -7566,12 +7590,12 @@ static int __stmmac_dvr_probe(struct device *device,
+@@ -7584,12 +7608,12 @@ static int __stmmac_dvr_probe(struct device *device,
  	priv->dev->irq = res->irq;
  	priv->wol_irq = res->wol_irq;
  	priv->sfty_irq = res->sfty_irq;

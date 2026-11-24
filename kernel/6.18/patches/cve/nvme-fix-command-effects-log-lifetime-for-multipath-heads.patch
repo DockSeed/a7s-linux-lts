@@ -32,7 +32,7 @@ Assisted-by: Claude
 diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
 --- a/drivers/nvme/host/core.c
 +++ b/drivers/nvme/host/core.c
-@@ -3138,9 +3138,16 @@ static void nvme_release_subsystem(struct device *dev)
+@@ -3137,9 +3137,16 @@ static void nvme_release_subsystem(struct device *dev)
  {
  	struct nvme_subsystem *subsys =
  		container_of(dev, struct nvme_subsystem, dev);
@@ -49,7 +49,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	kfree(subsys);
  }
  
-@@ -3251,6 +3258,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
+@@ -3250,6 +3257,7 @@ static int nvme_init_subsystem(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
  	kref_init(&subsys->ref);
  	INIT_LIST_HEAD(&subsys->ctrls);
  	INIT_LIST_HEAD(&subsys->nsheads);
@@ -57,7 +57,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	nvme_init_subnqn(subsys, ctrl, id);
  	memcpy(subsys->serial, id->sn, sizeof(subsys->serial));
  	memcpy(subsys->model, id->mn, sizeof(subsys->model));
-@@ -3354,7 +3362,7 @@ int nvme_get_log(struct nvme_ctrl *ctrl, u32 nsid, u8 log_page, u8 lsp, u8 csi,
+@@ -3353,7 +3361,7 @@ int nvme_get_log(struct nvme_ctrl *ctrl, u32 nsid, u8 log_page, u8 lsp, u8 csi,
  static int nvme_get_effects_log(struct nvme_ctrl *ctrl, u8 csi,
  				struct nvme_effects_log **log)
  {
@@ -66,7 +66,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	int ret;
  
  	if (cel)
-@@ -3371,7 +3379,7 @@ static int nvme_get_effects_log(struct nvme_ctrl *ctrl, u8 csi,
+@@ -3370,7 +3378,7 @@ static int nvme_get_effects_log(struct nvme_ctrl *ctrl, u8 csi,
  		return ret;
  	}
  
@@ -75,7 +75,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	if (xa_is_err(old)) {
  		kfree(cel);
  		return xa_err(old);
-@@ -3446,7 +3454,7 @@ static int nvme_init_effects_log(struct nvme_ctrl *ctrl,
+@@ -3445,7 +3453,7 @@ static int nvme_init_effects_log(struct nvme_ctrl *ctrl,
  	if (!effects)
  		return -ENOMEM;
  
@@ -84,7 +84,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	if (xa_is_err(old)) {
  		kfree(effects);
  		return xa_err(old);
-@@ -3492,23 +3500,27 @@ static int nvme_init_effects(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
+@@ -3491,23 +3499,27 @@ static int nvme_init_effects(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
  {
  	int ret = 0;
  
@@ -116,7 +116,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  }
  
  static int nvme_check_ctrl_fabric_info(struct nvme_ctrl *ctrl, struct nvme_id_ctrl *id)
-@@ -5068,19 +5080,6 @@ void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
+@@ -5067,19 +5079,6 @@ void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
  }
  EXPORT_SYMBOL_GPL(nvme_uninit_ctrl);
  
@@ -136,7 +136,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  static void nvme_free_ctrl(struct device *dev)
  {
  	struct nvme_ctrl *ctrl =
-@@ -5093,7 +5092,6 @@ static void nvme_free_ctrl(struct device *dev)
+@@ -5092,7 +5091,6 @@ static void nvme_free_ctrl(struct device *dev)
  		blk_put_queue(ctrl->fabrics_q);
  	if (!subsys || ctrl->instance != subsys->instance)
  		ida_free(&nvme_instance_ida, ctrl->instance);
@@ -144,7 +144,7 @@ diff --git a/drivers/nvme/host/core.c b/drivers/nvme/host/core.c
  	nvme_mpath_uninit(ctrl);
  	cleanup_srcu_struct(&ctrl->srcu);
  	nvme_auth_stop(ctrl);
-@@ -5139,7 +5137,6 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
+@@ -5138,7 +5136,6 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
  
  	mutex_init(&ctrl->scan_lock);
  	INIT_LIST_HEAD(&ctrl->namespaces);

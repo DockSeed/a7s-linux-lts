@@ -88,7 +88,7 @@ diff --git a/arch/um/drivers/vector_transports.c b/arch/um/drivers/vector_transp
 diff --git a/drivers/net/tun.c b/drivers/net/tun.c
 --- a/drivers/net/tun.c
 +++ b/drivers/net/tun.c
-@@ -1820,12 +1820,7 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
+@@ -1824,12 +1824,7 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
  		}
  	}
  
@@ -102,7 +102,7 @@ diff --git a/drivers/net/tun.c b/drivers/net/tun.c
  	switch (tun->flags & TUN_TYPE_MASK) {
  	case IFF_TUN:
  		if (tun->flags & IFF_NO_PI) {
-@@ -1850,9 +1845,8 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
+@@ -1854,9 +1849,8 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
  			}
  		}
  
@@ -113,7 +113,7 @@ diff --git a/drivers/net/tun.c b/drivers/net/tun.c
  		break;
  	case IFF_TAP:
  		if (!pskb_may_pull(skb, ETH_HLEN)) {
-@@ -1860,10 +1854,19 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
+@@ -1864,10 +1858,19 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
  			drop_reason = SKB_DROP_REASON_HDR_TRUNC;
  			goto drop;
  		}
@@ -134,7 +134,7 @@ diff --git a/drivers/net/tun.c b/drivers/net/tun.c
  	/* copy skb_ubuf_info for callback when skb has no error */
  	if (zerocopy) {
  		skb_zcopy_init(skb, msg_control);
-@@ -2471,6 +2474,8 @@ static int tun_xdp_one(struct tun_struct *tun,
+@@ -2481,6 +2484,8 @@ static int tun_xdp_one(struct tun_struct *tun,
  
  	features = tun_vnet_hdr_guest_features(READ_ONCE(tun->vnet_hdr_sz));
  	tnl_hdr = (struct virtio_net_hdr_v1_hash_tunnel *)gso;
@@ -146,7 +146,7 @@ diff --git a/drivers/net/tun.c b/drivers/net/tun.c
 diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
 --- a/drivers/net/virtio_net.c
 +++ b/drivers/net/virtio_net.c
-@@ -2593,6 +2593,8 @@ static void virtnet_receive_done(struct virtnet_info *vi, struct receive_queue *
+@@ -2602,6 +2602,8 @@ static void virtnet_receive_done(struct virtnet_info *vi, struct receive_queue *
  		goto frame_err;
  	}
  

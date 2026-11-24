@@ -21,7 +21,7 @@ diff --git a/Documentation/devicetree/bindings/vendor-prefixes.yaml b/Documentat
 index 5a806faf7170..3ffb1a8e24af 100644
 --- a/Documentation/devicetree/bindings/vendor-prefixes.yaml
 +++ b/Documentation/devicetree/bindings/vendor-prefixes.yaml
-@@ -727,6 +727,8 @@ patternProperties:
+@@ -737,6 +737,8 @@ patternProperties:
      description: Hycon Technology Corp.
    "^hydis,.*":
      description: Hydis Technologies

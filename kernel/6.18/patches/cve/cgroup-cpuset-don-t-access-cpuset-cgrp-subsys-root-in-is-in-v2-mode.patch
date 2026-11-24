@@ -53,7 +53,7 @@ diff --git a/kernel/cgroup/cpuset.c b/kernel/cgroup/cpuset.c
  }
  
  static inline bool cpuset_is_populated(struct cpuset *cs)
-@@ -3795,6 +3800,8 @@ static void cpuset_bind(struct cgroup_subsys_state *root_css)
+@@ -3798,6 +3803,8 @@ static void cpuset_bind(struct cgroup_subsys_state *root_css)
  	mutex_lock(&cpuset_mutex);
  	spin_lock_irq(&callback_lock);
  
