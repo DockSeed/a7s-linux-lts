@@ -161,14 +161,17 @@ driver, the second run installs `a7s-aic8800-dkms`.
 ### Changed
 
 - aic8800: patches from other projects are carried unchanged in
-  `out-of-tree/aic8800/patches/upstream/` and applied before ours: Feng
-  Zhang's `fix-Lower-the-debugging-log-level`, bnister's Bluetooth firmware
-  upload fix and Jiali Chen's `fix-usb-suspend-reboot-hang`. What we changed
-  in them is a patch of our own on top. Feng Zhang's PCIe and SDIO hunks now
-  apply too (not built). Our patch messages are shorter.
+  `out-of-tree/aic8800/patches/upstream/` and applied before ours: the
+  radxa-pkg/aic8800 pull requests 114 and 106 (below) and bnister's Bluetooth
+  firmware upload fix. Feng Zhang's `fix-Lower-the-debugging-log-level` and Jiali
+  Chen's `fix-usb-suspend-reboot-hang` come with Radxa's
+  `debian/patches/series`. What we changed in them is a patch of our own on
+  top. Feng Zhang's PCIe and SDIO hunks now apply too (not built). Our patch
+  messages are shorter.
 - aic8800: the source is Radxa's `5.0+git20260123.5f7be68d-11` as shipped
   (its `debian/patches/series`, with Feng Zhang's and Jiali Chen's patches),
-  plus radxa-pkg/aic8800 pull requests 114 (16 of 17) and 106 unchanged.
+  plus, in `patches/upstream/`, radxa-pkg/aic8800 pull requests 114 (16 of
+  17) and 106 (1) and bnister's patch (1), unchanged.
   Seven of our patches and the compat patch are dropped, one is added. The
   counter `rx_unknown_msgs` is gone.
 - Linux 6.18.64 (longterm) as the base, up from 6.18.63, with the fixes of that

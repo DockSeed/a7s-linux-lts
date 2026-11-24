@@ -160,7 +160,7 @@ jobs:
           - The recipe (patches, config, build scripts) is the source archive of this tag that GitHub attaches to the release, commit `@COMMIT@`.
           - `linux-@VERSION@.tar.xz`: the unchanged kernel tarball from cdn.kernel.org, sha256 `@TARBALL_SHA256@`.
 
-          The same build from the source, `./build.sh` in the tagged checkout, gives the same `Image`, device tree blob, `config` and `System.map`; their checksums are in `KERNEL-ID`.
+          The same build from the source, `A7S_KERNEL_REVISION=r<n> ./build.sh` in the tagged checkout (`r<n>` the revision of the tag), gives the same `Image`, device tree blob, `config` and `System.map`; their checksums are in `KERNEL-ID`.
 
           ## Not included
 

@@ -286,17 +286,21 @@ group depends on the configuration and the device tree: with the base config
 and the shipped dtb, MPLS, sched_ext, the erofs on-demand (fscache) backend and
 fscache itself are off, no built network driver offers the queue management
 that io_uring zero-copy receive needs, and the GMAC has no `snps,tso`. Turning
-one of these on makes its CVEs apply again. The state per release is in
-[CHANGELOG.md](../CHANGELOG.md).
+one of these on makes its CVEs apply again. The state of the last audit,
+6.18.63-R1, is in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Checked
 
-Against the pristine tree in the builder container: all 290 patches apply at
-fuzz 0 without offsets; `make a7s_defconfig && make savedefconfig` reproduces
-`config` (apart from its header comment); `make dtbs` and `make W=1` over the
-display, PHY, PCIe, CCU, pin controller and USB/Bluetooth code touched by the
-series are warning-free; `dt_binding_check` passes for the CH334 and AIC8800D80
-bindings, and `dtbs_check` of `sun60i-a733-cubie-a7s.dtb` against those two
-bindings and the generic USB device and hub schemas reports nothing
-(dtschema 2026.9, installed in the builder with pip: the builder image does not
-carry it). The check covers only those schemas, not every binding of the board.
+Every build checks, against the pristine tree in the builder container, that
+all patches apply at fuzz 0 without offsets (290 for 6.18.65). That
+`make a7s_defconfig && make savedefconfig` reproduces `config` (apart from its
+header comment) was checked by hand for 6.18.65 (CHANGELOG.md, 6.18.65-R1).
+
+Last recorded for 6.18.59; not repeated since: `make dtbs` and `make W=1` over
+the display, PHY, PCIe, CCU, pin controller and USB/Bluetooth code touched by
+the series were warning-free; `dt_binding_check` passed for the CH334 and
+AIC8800D80 bindings, and `dtbs_check` of `sun60i-a733-cubie-a7s.dtb` against
+those two bindings and the generic USB device and hub schemas reported
+nothing (dtschema 2026.9, installed in the builder with pip: the builder image
+does not carry it). The check covered only those schemas, not every binding of
+the board.

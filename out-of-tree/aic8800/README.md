@@ -166,8 +166,8 @@ file with CRLF line ends the hunk lines get CRLF at apply time.
     device and the wakeup sources stay on the USB device.
 18. `aic8800_fdrv-bound-the-a-msdu-subframe-length` - an A-MSDU subframe shorter
     than its LLC/SNAP head or past the frame ends the split.
-19. `aic8800_fdrv-check-whole-rx-frames-and-messages-against-what-was-received`
-    - every rx frame and message must fit in what was received.
+19. `aic8800_fdrv-check-whole-rx-frames-and-messages-against-what-was-received` -
+    every rx frame and message must fit in what was received.
 20. `aic8800_fdrv-read-the-a-msdu-flag-before-the-split-frees-the-frame` - the
     A-MSDU flag is read before the split frees the frame.
 21. `aic8800_fdrv-bound-the-firmware-assert-text-to-its-buffer` - the firmware

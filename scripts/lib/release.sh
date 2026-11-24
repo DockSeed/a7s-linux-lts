@@ -13,11 +13,12 @@
 #   linux-image-<release>_<version>_arm64.deb     the kernel and its modules
 #   linux-headers-<release>_<version>_arm64.deb   the build environment for modules
 #   a7s-kernel-hook_<version>_all.deb             the extlinux hooks (scripts/lib/hook.sh)
+#   a7s-aic8800-dkms_<version>_all.deb            the AIC8800 driver as DKMS source (scripts/lib/dkms.sh)
 #   a7s-linux-lts-<release>-modules.tar.xz        the same modules as a tarball
 #   linux-<version>.tar.xz                        the pristine kernel source (sha256 pinned)
 #   SHA256SUMS                                    over all of the above
 #
-# The AIC8800 modules are not part of it: the image recipe builds that driver.
+# No built AIC8800 modules are part of it; the driver comes as DKMS source.
 # The module tarball is made without updates/aic8800/ and depmod is run again
 # over what is left. Every module in the tarball and in the image package must
 # declare a GPL-compatible MODULE_LICENSE, and the packages must be what this

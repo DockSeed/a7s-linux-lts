@@ -59,7 +59,7 @@ its own builder.
 | `compile-check` | configure and compile only the A733 driver directories (fast) |
 | `build` | configure, build `Image`, the dtb, the modules and the driver, write `KERNEL-ID` |
 | `all` | `fetch`, `apply-patches`, `build` |
-| `deb` | after `build`, with `A7S_KERNEL_REVISION=r<n>` (or `t<n>`): `linux-image` and `linux-headers` as Debian packages in `out/deb/`, and `a7s-kernel-hook` (step `hook`) |
+| `deb` | after `build`, with `A7S_KERNEL_REVISION=r<n>` (or `t<n>`): `linux-image` and `linux-headers` as Debian packages in `out/deb/`, `a7s-kernel-hook` (step `hook`) and `a7s-aic8800-dkms` |
 | `hook` | with `A7S_KERNEL_REVISION`, no kernel build needed: `a7s-kernel-hook_<version>_all.deb` in `out/deb/` |
 | `package` | after `build` and `deb`: the release files in `out/release/` (see [Releases](#releases)) |
 | `key` | print the identity of this checkout: `<version>-<tarball sha256 12>-<hash 12>`; the hash covers `scripts/`, `kernel/`, `pins/`, `out-of-tree/`, `container/packages.txt` and the build time |
